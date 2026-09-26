@@ -81,15 +81,20 @@ class Generator(Protocol):
     def __call__(self, prompt: str) -> str: ...
 
 
+class Reranker(Protocol):
+    def __call__(self, query: str, evidence: tuple[Evidence, ...]) -> Sequence[Evidence]: ...
+
+
 _ARABIC_MARKS = re.compile(r"[\u064b-\u065f\u0670\u0640]")
 _WORD = re.compile(r"[\w]+", flags=re.UNICODE)
 _CITE = re.compile(r"\[E(\d+)\]")
 
 
 def _terms(value: str) -> list[str]:
-    value = _ARABIC_MARKS.sub("", value.lower())
-    value = value.translate(str.maketrans("أإآٱىؤئ", "اااايوي"))
-    return _WORD.findall(unicodedata.normalize("NFKC", value))
+    value = unicodedata.normalize("NFKC", value.lower())
+    value = _ARABIC_MARKS.sub("", value)
+    value = value.translate(str.maketrans("أإآٱىؤئةکی", "اااايويهكي"))
+    return _WORD.findall(value)
 
 
 def _chunks(text: str, max_chars: int, overlap: int) -> list[tuple[str, int, int]]:
@@ -143,6 +148,7 @@ class NewsroomRAG:
                  chunk_size: int = 900, overlap: int = 100,
                  recency_half_life_days: float | None = None,
                  lexical_weight: float = 0.65,
+                 rerank: Reranker | None = None,
                  clock: Callable[[], datetime] | None = None):
         if chunk_size < 100 or not 0 <= overlap < chunk_size // 2:
             raise ValidationError("chunk_size >= 100 and 0 <= overlap < chunk_size/2 required")
@@ -150,7 +156,7 @@ class NewsroomRAG:
             raise ValidationError("recency_half_life_days must be positive")
         if not 0 <= lexical_weight <= 1:
             raise ValidationError("lexical_weight must be between 0 and 1")
-        self.embed, self.generate = embed, generate
+        self.embed, self.generate, self.rerank = embed, generate, rerank
         self.chunk_size, self.overlap = chunk_size, overlap
         self.recency_half_life_days = recency_half_life_days
         self.lexical_weight = lexical_weight
@@ -244,6 +250,17 @@ class NewsroomRAG:
                                      round(score, 6), c.start, c.end, c.source.publisher))
             if len(selected) >= top_k:
                 break
+        if self.rerank and selected:
+            original = tuple(selected)
+            reordered = tuple(self.rerank(query, original))
+            # The adapter can reorder, not inject passages or rewrite evidence.
+            if (len(reordered) != len(original) or
+                {id(e) for e in reordered} != {id(e) for e in original} or
+                any(not isinstance(e, Evidence) for e in reordered)):
+                raise ValidationError("Reranker must return a permutation of the supplied evidence")
+            selected = [Evidence(f"E{i}", e.source_id, e.title, e.excerpt, e.url,
+                                 e.published_at, e.score, e.start, e.end, e.publisher)
+                        for i, e in enumerate(reordered, 1)]
         return tuple(selected)
 
     def ask(self, question: str, *, top_k: int = 5, as_of: datetime | None = None,
