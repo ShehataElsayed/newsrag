@@ -78,4 +78,4 @@ Use `RetrievalCase` and `evaluate_retrieval` with independently labeled relevant
 
 ### Awaitable façade
 
-`AsyncNewsroomRAG(NewsroomRAG(...))` exposes `await add(...)`, `replace(...)`, `search(...)` and `ask(...)`. It runs the synchronous core and its provider callables in worker threads and serializes operations on that instance. This can keep an event loop responsive, but it is not a native coroutine provider interface and does not promise cross-process or direct-core thread safety. Do not mutate the wrapped `NewsroomRAG` outside the façade while tasks run.
+`AsyncNewsroomRAG(NewsroomRAG(...))` exposes `await add(...)`, `replace(...)`, `search(...)` and `ask(...)`. It runs the synchronous core and its provider callables in worker threads and serializes operations on that instance even if an awaiting task is cancelled; cancellation does not stop provider work already running. This can keep an event loop responsive, but it is not a native coroutine provider interface and does not promise cross-process or direct-core thread safety. Do not mutate the wrapped `NewsroomRAG` outside the façade while tasks run.
