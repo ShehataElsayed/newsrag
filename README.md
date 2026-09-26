@@ -71,3 +71,7 @@ For a future public release, see [PyPI Trusted Publishing setup](docs/publishing
 ### Optional evidence reranking
 
 Pass `rerank=lambda query, evidence: ...` when you have a trusted reranking function. The function receives the initially retrieved evidence and must return a permutation of those same objects; new or rewritten passages are rejected. Citation IDs are reassigned after the new order. Reranking cannot recover evidence absent from the initial `top_k`, and does not check whether an answer is true. Arabic normalization includes common hamza, ta marbuta, alef maqsura and Persian keyboard letter variants; it is still not Arabic stemming or morphological analysis.
+
+### Retrieval evaluation
+
+Use `RetrievalCase` and `evaluate_retrieval` with independently labeled relevant source IDs to measure recall@k, hit rate@k, and reciprocal rank. See [evaluation guide](docs/evaluation.md). These metrics do not validate generated claims or source credibility.
