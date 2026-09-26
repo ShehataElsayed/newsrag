@@ -20,3 +20,7 @@ rag = NewsroomRAG(
 ```
 
 A provider must return one vector per input and use stable vector dimensions. Avoid changing the embedding model for a partially indexed corpus; build a fresh index if the model changes. Calls are synchronous and exceptions from providers propagate. Do not send source text to a provider without a valid editorial and privacy basis.
+
+## Optional reranker
+
+Pass `rerank=lambda query, evidence: ...` to `NewsroomRAG` to reorder the retrieved top-k passages. It receives a tuple of `Evidence` and must return a permutation of those exact objects; it cannot add or rewrite evidence. References are reassigned to `E1`, `E2`, etc. after reordering. Reranking applies only to the initially retrieved candidates; increase `top_k` when a larger candidate pool is needed. A reranker may send passages to an outside provider, so treat that adapter as a separate privacy and trust decision. Reordering does not verify any claim.
