@@ -75,3 +75,7 @@ Pass `rerank=lambda query, evidence: ...` when you have a trusted reranking func
 ### Retrieval evaluation
 
 Use `RetrievalCase` and `evaluate_retrieval` with independently labeled relevant source IDs to measure recall@k, hit rate@k, and reciprocal rank. See [evaluation guide](docs/evaluation.md). These metrics do not validate generated claims or source credibility.
+
+### Awaitable façade
+
+`AsyncNewsroomRAG(NewsroomRAG(...))` exposes `await add(...)`, `replace(...)`, `search(...)` and `ask(...)`. It runs the synchronous core and its provider callables in worker threads and serializes operations on that instance. This can keep an event loop responsive, but it is not a native coroutine provider interface and does not promise cross-process or direct-core thread safety. Do not mutate the wrapped `NewsroomRAG` outside the façade while tasks run.
