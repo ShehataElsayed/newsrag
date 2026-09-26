@@ -1,6 +1,6 @@
 # NewsRAG by Shehata El-sayed
 
-A small, auditable Python RAG toolkit for journalistic research. This is a v0.2 prototype. It has not been released on PyPI. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
+A small, auditable Python RAG toolkit for journalistic research. This v0.2 pre-release is a research prototype; check PyPI for publication status. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
 
@@ -66,7 +66,7 @@ Further reading: [architecture and provider contract](docs/architecture.md), [re
 
 An optional provider illustration is in [`examples/openai_adapter.py`](examples/openai_adapter.py). It requires a separately installed SDK and the user's own provider credentials; no credentials belong in this repository. Model names and SDK behavior can change, so validate an adapter against its provider's current documentation before using it.
 
-For a future public release, see [PyPI Trusted Publishing setup](docs/publishing.md). No API token is needed in GitHub Actions; the repository owner must configure the matching pending publisher in the intended PyPI account and review the tagged release.
+For release mechanics, see [PyPI Trusted Publishing setup](docs/publishing.md). No API token is needed in GitHub Actions. A GitHub release or a pending publisher alone is not proof that PyPI published the package; check the PyPI project and install before relying on it.
 
 ### Optional evidence reranking
 
