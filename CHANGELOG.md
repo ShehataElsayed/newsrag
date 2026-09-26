@@ -19,3 +19,4 @@
 - Add tests for Arabic variants, reranking, citation IDs and rejected adapter output.
 - Add a small deterministic retrieval evaluation harness with source-level recall@k, hit rate@k, mean reciprocal rank and missed queries; document its limits.
 - Reject non-finite ranking configuration, nonnumeric embedding values and invalid source metadata with ValidationError.
+- Add an awaitable façade that runs synchronous provider calls in worker threads and serializes operations per instance; it is not a native async provider contract.
