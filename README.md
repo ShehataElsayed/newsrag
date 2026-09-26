@@ -1,6 +1,6 @@
 # NewsRAG by Shehata El-sayed
 
-A small, auditable Python RAG toolkit for journalistic research. This 0.3 branch is a research prototype; check PyPI for the latest published version. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
+A small, auditable Python RAG toolkit for journalistic research. Version 0.3.0 is a research preview; check PyPI for the latest published version. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
 
@@ -26,7 +26,7 @@ answer = rag.ask("ما الذي أُعلن؟")
 print(answer.text, answer.evidence, answer.warnings)
 ```
 
-Install locally with `python -m pip install .`; run tests with `PYTHONPATH=src python -m unittest discover -s tests -v`, and run `PYTHONPATH=src python examples/quickstart.py` from this directory. No network calls occur unless your adapters make them.
+Install the published core with `python -m pip install newsrag` or install locally with `python -m pip install .`. Run tests with `PYTHONPATH=src python -m unittest discover -s tests -v`, and run `PYTHONPATH=src python examples/quickstart.py` from this directory. The core does not make network calls by default; the optional URL fetcher, model download, and your provider adapters can.
 
 ## Newsroom-specific controls
 
@@ -38,7 +38,7 @@ Install locally with `python -m pip install .`; run tests with `PYTHONPATH=src p
 
 ## Scope and limitations
 
-This v0.3 is an in-memory retrieval prototype with local JSON source snapshots, not a production crawler or fact-checker. It handles plain text and synchronous callable adapters; automatic fetching of URLs, OCR for scanned PDFs, database connectors, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Lexical Arabic tokenization is basic, not morphological. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
+Version 0.3.0 uses an in-memory retrieval index with local JSON snapshots and optional SQLite source persistence. It is not a production crawler or fact-checker. Plain-text ingestion and synchronous callable adapters are the core; optional guarded single-page HTTPS fetching is available with `newsrag[web]`. OCR for scanned PDFs, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Arabic light stemming is optional with `newsrag[arabic]`, not full morphology. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
 
 
 ## Quality checks
@@ -60,9 +60,9 @@ restored = load_sources("research.json")
 # document = source_from_pdf(id="file-1", title="Report", pdf_bytes=pdf_data)
 ```
 
-For web ingestion, the caller is responsible for fetching, verifying the URL, handling redirects, authentication, robots/licensing rules and SSRF protection. Passing HTML does not prove its authorship. HTML extraction is simple and may include navigation text; review the output. PDF extraction is text-only and may require OCR for scans. Snapshots store unencrypted source text, so keep them in a secure location; the writer uses 0600 permissions on POSIX. There is no network fetcher or hosted persistence. The latest source content should be rechecked at the original publisher before publication.
+When passing HTML directly, the caller is responsible for fetching it and checking the original URL, redirects, authentication, robots/licensing rules, and SSRF protections. The optional guarded `source_from_url` fetcher is described below and does not replace editorial or licensing review. Passing HTML does not prove its authorship. HTML extraction may include navigation text; review the output. PDF extraction is text-only and may require OCR for scans. JSON snapshots and SQLite stores hold unencrypted source text, so keep them secure; both create files with mode 0600 on POSIX. There is no hosted persistence. Recheck the latest source content at the original publisher before publication.
 
-Further reading: [architecture and provider contract](docs/architecture.md), [release checklist](docs/release-checklist.md), [contributing](CONTRIBUTING.md), [security](SECURITY.md), and [changelog](CHANGELOG.md). These are preparation for a public release, not evidence it has been published or reviewed independently.
+Further reading: [architecture and provider contract](docs/architecture.md), [release checklist](docs/release-checklist.md), [contributing](CONTRIBUTING.md), [security](SECURITY.md), and [changelog](CHANGELOG.md). The package is published on PyPI; publication is not evidence that it has been reviewed independently.
 
 An optional provider illustration is in [`examples/openai_adapter.py`](examples/openai_adapter.py). It requires a separately installed SDK and the user's own provider credentials; no credentials belong in this repository. Model names and SDK behavior can change, so validate an adapter against its provider's current documentation before using it.
 
