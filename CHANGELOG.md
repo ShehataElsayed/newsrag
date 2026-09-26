@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 - 2026-09-26
+
+- Update the published package description to match current 0.3 features and limits; no retrieval or API behavior changes from 0.3.0.
+- Refresh GitHub release presentation and README wording.
+
 ## 0.3.0 - 2026-09-26
 
 - Normalize common Arabic letter variants after Unicode NFKC normalization (including Persian keyboard variants).
