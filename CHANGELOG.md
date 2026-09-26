@@ -17,3 +17,4 @@
 - Normalize common Arabic letter variants after Unicode NFKC normalization (including Persian keyboard variants).
 - Allow an optional caller-supplied reranker to reorder retrieved evidence without changing or injecting passages; citation IDs are reassigned after reranking.
 - Add tests for Arabic variants, reranking, citation IDs and rejected adapter output.
+- Add a small deterministic retrieval evaluation harness with source-level recall@k, hit rate@k, mean reciprocal rank and missed queries; document its limits.
