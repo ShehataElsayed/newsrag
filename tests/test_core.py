@@ -136,3 +136,23 @@ class TestRerankAndNormalization(unittest.TestCase):
             Source("a", "A", "alpha"), Source("b", "B", "alpha"))
         with self.assertRaises(ValidationError):
             rag.search("alpha", top_k=2)
+
+class TestInvalidNumerics(unittest.TestCase):
+    def test_nonfinite_configuration(self):
+        for value in (float("nan"), float("inf"), float("-inf")):
+            with self.assertRaises(ValidationError):
+                NewsroomRAG(lexical_weight=value)
+            with self.assertRaises(ValidationError):
+                NewsroomRAG(recency_half_life_days=value)
+
+    def test_nonnumeric_embeddings(self):
+        rag = NewsroomRAG(embed=lambda texts: [["not a float"] for _ in texts])
+        with self.assertRaises(ValidationError):
+            rag.add(Source("id", "Title", "sample"))
+        self.assertEqual(rag._sources, {})
+
+    def test_nonstr_source_values(self):
+        with self.assertRaises(ValidationError):
+            Source(1, "Title", "sample")
+        with self.assertRaises(ValidationError):
+            Source("id", "Title", "sample", published_at="yesterday")
