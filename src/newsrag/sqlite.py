@@ -43,6 +43,22 @@ class SQLiteSourceStore:
             self._db.close()
             raise
 
+    def backup(self, destination: str | Path) -> None:
+        """Take a consistent SQLite backup, including uncheckpointed live changes."""
+        target = Path(destination)
+        if target == self.path:
+            raise ValidationError("Backup destination must differ from the source")
+        if target.exists():
+            raise ValidationError("Backup destination already exists")
+        fd = os.open(target, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+        os.close(fd)
+        try:
+            with sqlite3.connect(target) as output:
+                self._db.backup(output)
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+
     def upsert(self, source: Source) -> None:
         """Insert or replace one source atomically."""
         record = {"id": source.id, "title": source.title, "text": source.text,
