@@ -11,3 +11,9 @@
 - Initial provider-neutral in-memory retrieval with Arabic and English lexical matching.
 - Added source metadata, exact offsets, date filters, optional embeddings and generation adapters.
 - Added citation reference validation, abstention on no matches and review warnings.
+
+## Unreleased
+
+- Normalize common Arabic letter variants after Unicode NFKC normalization (including Persian keyboard variants).
+- Allow an optional caller-supplied reranker to reorder retrieved evidence without changing or injecting passages; citation IDs are reassigned after reranking.
+- Add tests for Arabic variants, reranking, citation IDs and rejected adapter output.
