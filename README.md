@@ -43,7 +43,7 @@ Version 0.3.0 uses an in-memory retrieval index with local JSON snapshots and op
 
 ## Quality checks
 
-Run `python -m pip install -e . pytest ruff mypy build "pypdf>=5,<7"`, then `ruff check src tests examples setup.py`, `mypy src/newsrag`, `pytest -q`, and `python -m build`. CI is configured to run these checks on Python 3.10–3.13; this local package was checked on Python 3.10 only. A passing suite reduces risk but cannot guarantee zero bugs or factual accuracy.
+Run `python -m pip install -e . pytest ruff mypy build "pypdf>=5,<7"`, then `ruff check src tests examples setup.py`, `mypy src/newsrag`, `pytest -q`, and `python -m build`. CI is configured to run these checks on Python 3.10–3.13; the release workflow tested Python 3.12 and the quality matrix covers Python 3.10–3.13. A passing suite reduces risk but cannot guarantee zero bugs or factual accuracy.
 
 ## Local ingestion and snapshots
 
@@ -70,7 +70,7 @@ For release mechanics, see [PyPI Trusted Publishing setup](docs/publishing.md). 
 
 ### Optional evidence reranking
 
-Pass `rerank=lambda query, evidence: ...` when you have a trusted reranking function. The function receives the initially retrieved evidence and must return a permutation of those same objects; new or rewritten passages are rejected. Citation IDs are reassigned after the new order. Reranking cannot recover evidence absent from the initial `top_k`, and does not check whether an answer is true. Arabic normalization includes common hamza, ta marbuta, alef maqsura and Persian keyboard letter variants; it is still not Arabic stemming or morphological analysis.
+Pass `rerank=lambda query, evidence: ...` when you have a trusted reranking function. The function receives the initially retrieved evidence and must return a permutation of those same objects; new or rewritten passages are rejected. Citation IDs are reassigned after the new order. Reranking cannot recover evidence absent from the initial `top_k`, and does not check whether an answer is true. Arabic normalization includes common hamza, ta marbuta, alef maqsura and Persian keyboard letter variants; normalization alone is not Arabic stemming or morphological analysis; optional Snowball light stemming is described below.
 
 ### Retrieval evaluation
 
