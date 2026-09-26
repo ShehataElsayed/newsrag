@@ -26,5 +26,6 @@ setup(
     package_dir={"": "src"}, python_requires=">=3.10",
     install_requires=[], extras_require={"pdf": ["pypdf>=5,<7"],
                                       "multilingual": ["sentence-transformers>=3,<6"],
-                                      "arabic": ["snowballstemmer>=2.2,<4"]},
+                                      "arabic": ["snowballstemmer>=2.2,<4"],
+                                      "web": ["trafilatura>=1.12,<3"]},
 )
