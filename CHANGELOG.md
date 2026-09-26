@@ -25,3 +25,4 @@
 - Add a transactional SQLite source store with restricted POSIX file mode. It persists source text and metadata, not a vector or lexical index.
 - Add a consistent SQLite backup method that refuses overwrites and writes with restricted POSIX permissions.
 - Add optional local multilingual sentence embeddings, normalized lexical/semantic score fusion, and optional Snowball Arabic light stemming.
+- Add optional allowlisted single-URL HTTPS article fetching with public-DNS checks, robots permission, redirect rejection, response limits and Trafilatura extraction; no general crawler.
