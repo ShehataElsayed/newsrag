@@ -1,6 +1,6 @@
 # NewsRAG by Shehata El-sayed
 
-A small, auditable Python RAG toolkit for journalistic research. This v0.2 pre-release is a research prototype; check PyPI for publication status. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
+A small, auditable Python RAG toolkit for journalistic research. This v0.3 pre-release is a research prototype; check PyPI for publication status. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
 
@@ -38,7 +38,7 @@ Install locally with `python -m pip install .`; run tests with `PYTHONPATH=src p
 
 ## Scope and limitations
 
-This v0.2 is an in-memory retrieval prototype with local JSON source snapshots, not a production crawler or fact-checker. It handles plain text and synchronous callable adapters; automatic fetching of URLs, OCR for scanned PDFs, database connectors, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Lexical Arabic tokenization is basic, not morphological. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
+This v0.3 is an in-memory retrieval prototype with local JSON source snapshots, not a production crawler or fact-checker. It handles plain text and synchronous callable adapters; automatic fetching of URLs, OCR for scanned PDFs, database connectors, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Lexical Arabic tokenization is basic, not morphological. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
 
 
 ## Quality checks
@@ -79,3 +79,14 @@ Use `RetrievalCase` and `evaluate_retrieval` with independently labeled relevant
 ### Awaitable façade
 
 `AsyncNewsroomRAG(NewsroomRAG(...))` exposes `await add(...)`, `replace(...)`, `remove(...)`, `search(...)` and `ask(...)`. It runs the synchronous core and its provider callables in worker threads and serializes operations on that instance even if an awaiting task is cancelled; cancellation does not stop provider work already running. This can keep an event loop responsive, but it is not a native coroutine provider interface and does not promise cross-process or direct-core thread safety. Do not mutate the wrapped `NewsroomRAG` outside the façade while tasks run.
+
+### SQLite source store (v0.3)
+
+```python
+from newsrag import SQLiteSourceStore, NewsroomRAG, Source
+with SQLiteSourceStore("research.db") as store:
+    store.upsert(Source("story-1", "Story", "Verified source text goes here"))
+    rag = NewsroomRAG().add(*store.sources())
+```
+
+SQLite stores source text and metadata transactionally and creates a new database with mode 0600 on POSIX. It does not persist embeddings or an already-built search index: rebuild chunks and vectors at startup, with provider costs if configured. The file is not encrypted; protect and back it up with SQLite's backup API rather than copying it while live. Do not use this as a multiwriter service without an application-level concurrency plan.
