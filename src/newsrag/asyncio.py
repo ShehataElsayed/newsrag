@@ -36,6 +36,10 @@ class AsyncNewsroomRAG:
         await asyncio.to_thread(self._call, self.rag.add, *sources)
         return self
 
+    async def remove(self, source_id: str) -> AsyncNewsroomRAG:
+        await asyncio.to_thread(self._call, self.rag.remove, source_id)
+        return self
+
     async def replace(self, source: Source) -> AsyncNewsroomRAG:
         await asyncio.to_thread(self._call, self.rag.replace, source)
         return self
