@@ -12,7 +12,7 @@
 - Added source metadata, exact offsets, date filters, optional embeddings and generation adapters.
 - Added citation reference validation, abstention on no matches and review warnings.
 
-## Unreleased
+## 0.3.0 - 2026-09-26
 
 - Normalize common Arabic letter variants after Unicode NFKC normalization (including Persian keyboard variants).
 - Allow an optional caller-supplied reranker to reorder retrieved evidence without changing or injecting passages; citation IDs are reassigned after reranking.
@@ -22,3 +22,4 @@
 - Add an awaitable façade that runs synchronous provider calls in worker threads and serializes operations per instance; it is not a native async provider contract.
 - Keep the wrapped index serialized when a caller cancels a running worker-thread operation; cancellation does not stop provider work already underway.
 - Add `remove(source_id)` in the sync core and awaitable façade for explicit source deletion.
+- Add a transactional SQLite source store with restricted POSIX file mode. It persists source text and metadata, not a vector or lexical index.
