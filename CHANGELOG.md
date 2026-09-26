@@ -23,3 +23,4 @@
 - Keep the wrapped index serialized when a caller cancels a running worker-thread operation; cancellation does not stop provider work already underway.
 - Add `remove(source_id)` in the sync core and awaitable façade for explicit source deletion.
 - Add a transactional SQLite source store with restricted POSIX file mode. It persists source text and metadata, not a vector or lexical index.
+- Add a consistent SQLite backup method that refuses overwrites and writes with restricted POSIX permissions.
