@@ -1,6 +1,6 @@
 # NewsRAG by Shehata El-sayed
 
-A small, auditable Python RAG toolkit for journalistic research. This v0.3 pre-release is a research prototype; check PyPI for publication status. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
+A small, auditable Python RAG toolkit for journalistic research. This 0.3 branch is a research prototype; check PyPI for the latest published version. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
 
@@ -92,3 +92,9 @@ with SQLiteSourceStore("research.db") as store:
 SQLite stores source text and metadata transactionally and creates a new database with mode 0600 on POSIX. It does not persist embeddings or an already-built search index: rebuild chunks and vectors at startup, with provider costs if configured. The file is not encrypted; protect and back it up with SQLite's backup API rather than copying it while live. Do not use this as a multiwriter service without an application-level concurrency plan.
 
 To make a consistent backup while the database is open, use `store.backup("research-backup.db")`. It refuses to overwrite an existing destination and creates the backup with mode 0600 on POSIX. Protect both files: neither is encrypted.
+
+### Optional multilingual retrieval
+
+Install `pip install 'newsrag[multilingual]'`, then pass `embed=MultilingualEmbedder()` to `NewsroomRAG`. The adapter lazily loads a local sentence-transformers multilingual MiniLM model (first use may download weights), and the built-in search blends per-query normalized lexical and semantic scores. Default lexical weight when an embedder is present is 0.2; set `lexical_weight=0` for semantic-only ranking. The initial model download goes to the model cache; review and pin model revisions for reproducibility and control outbound network access. The embedding model is trained by a third party, may have bias or gaps, and does not establish source truth. Rebuild an index if model versions change. No model weights are bundled in the PyPI package.
+
+For light Arabic stemming, install `pip install 'newsrag[arabic]'` and use `tokenize=ArabicLightTokenizer()`. It adds Snowball stem tokens alongside normalized surface terms. It is not full morphological analysis or contextual lemmatization; e.g. `بالمدارس` and `المدرسة` are not guaranteed to match. For reliable cross-language queries, use multilingual embeddings rather than stemming alone.
