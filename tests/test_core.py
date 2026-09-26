@@ -156,3 +156,13 @@ class TestInvalidNumerics(unittest.TestCase):
             Source(1, "Title", "sample")
         with self.assertRaises(ValidationError):
             Source("id", "Title", "sample", published_at="yesterday")
+
+class TestRemove(unittest.TestCase):
+    def test_remove_and_readd(self):
+        r = NewsroomRAG().add(Source("a", "A", "alpha"))
+        self.assertIs(r.remove("a"), r)
+        self.assertEqual(r.search("alpha"), ())
+        r.add(Source("a", "A", "beta"))
+        self.assertEqual(r.search("beta")[0].source_id, "a")
+        with self.assertRaises(ValidationError):
+            r.remove("missing")
