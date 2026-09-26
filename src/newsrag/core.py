@@ -28,11 +28,11 @@ class Source:
     source_type: str = "document"
 
     def __post_init__(self) -> None:
-        if not self.id.strip() or not self.title.strip() or not self.text.strip():
+        if any(not isinstance(value, str) or not value.strip() for value in (self.id, self.title, self.text)):
             raise ValidationError("Source id, title and text must be non-empty")
         for attr in ("published_at", "accessed_at"):
             value = getattr(self, attr)
-            if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            if value is not None and (not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None):
                 raise ValidationError(f"{attr} needs a timezone-aware datetime")
 
 
@@ -152,9 +152,9 @@ class NewsroomRAG:
                  clock: Callable[[], datetime] | None = None):
         if chunk_size < 100 or not 0 <= overlap < chunk_size // 2:
             raise ValidationError("chunk_size >= 100 and 0 <= overlap < chunk_size/2 required")
-        if recency_half_life_days is not None and recency_half_life_days <= 0:
+        if recency_half_life_days is not None and (not isfinite(recency_half_life_days) or recency_half_life_days <= 0):
             raise ValidationError("recency_half_life_days must be positive")
-        if not 0 <= lexical_weight <= 1:
+        if not isfinite(lexical_weight) or not 0 <= lexical_weight <= 1:
             raise ValidationError("lexical_weight must be between 0 and 1")
         self.embed, self.generate, self.rerank = embed, generate, rerank
         self.chunk_size, self.overlap = chunk_size, overlap
@@ -192,7 +192,7 @@ class NewsroomRAG:
         if len(vectors) != len(chunks) or not vectors or not vectors[0]:
             raise ValidationError("Embedder must return one non-empty vector per input")
         width = len(vectors[0])
-        if any(len(v) != width or any(not isfinite(x) for x in v) for v in vectors):
+        if any(len(v) != width or any(not isinstance(x, (int, float)) or not isfinite(x) for x in v) for v in vectors):
             raise ValidationError("Embedding vectors need consistent dimensions and finite values")
         for chunk, vector in zip(chunks, vectors):
             chunk.vector = vector
@@ -219,7 +219,7 @@ class NewsroomRAG:
         qvec = None
         if self.embed:
             qvectors = self.embed([query])
-            if len(qvectors) != 1 or not qvectors[0] or any(not isfinite(x) for x in qvectors[0]):
+            if len(qvectors) != 1 or not qvectors[0] or any(not isinstance(x, (int, float)) or not isfinite(x) for x in qvectors[0]):
                 raise ValidationError("Embedder must return one finite, non-empty query vector")
             qvec = qvectors[0]
         scored: list[tuple[float, _Chunk]] = []
