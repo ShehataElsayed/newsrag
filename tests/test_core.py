@@ -110,3 +110,29 @@ class TestProviderValidation(unittest.TestCase):
         r = NewsroomRAG(embed=embed).add(Source("a", "A", "alpha"))
         with self.assertRaises(ValidationError):
             r.search("beta")
+
+class TestRerankAndNormalization(unittest.TestCase):
+    def test_arabic_variants_match(self):
+        corpus = Source("a", "Arabic", "إمرأة في المؤسسة", language="ar")
+        rag = NewsroomRAG().add(corpus)
+        self.assertTrue(rag.search("امرأه"))
+        self.assertTrue(rag.search("الموسسه"))
+
+    def test_rerank_references_follow_new_order(self):
+        rag = NewsroomRAG(rerank=lambda query, hits: tuple(reversed(hits))).add(
+            Source("a", "A", "alpha"), Source("b", "B", "alpha"))
+        hits = rag.search("alpha", top_k=2)
+        self.assertEqual([h.source_id for h in hits], ["b", "a"])
+        self.assertEqual([h.ref for h in hits], ["E1", "E2"])
+
+    def test_rerank_cannot_rewrite_or_inject(self):
+        rag = NewsroomRAG(rerank=lambda query, hits: (Source("x", "X", "wrong"),)).add(
+            Source("a", "A", "alpha"))
+        with self.assertRaises(ValidationError):
+            rag.search("alpha")
+
+    def test_rerank_cannot_duplicate(self):
+        rag = NewsroomRAG(rerank=lambda query, hits: (hits[0], hits[0])).add(
+            Source("a", "A", "alpha"), Source("b", "B", "alpha"))
+        with self.assertRaises(ValidationError):
+            rag.search("alpha", top_k=2)
