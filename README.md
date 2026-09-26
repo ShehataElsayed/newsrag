@@ -1,6 +1,6 @@
 # NewsRAG by Shehata El-sayed
 
-An auditable Python RAG toolkit for journalistic source research. Version 0.3.0 offers optional multilingual retrieval, Arabic light stemming, SQLite source storage, and guarded single-page URL ingestion. It does not verify generated claims or replace editorial source checks. Python 3.10+; Apache-2.0 (see LICENSE and NOTICE).
+An auditable Python RAG toolkit for journalistic source research. Version 0.3.1 offers optional multilingual retrieval, Arabic light stemming, SQLite source storage, and guarded single-page URL ingestion. It does not verify generated claims or replace editorial source checks. Python 3.10+; Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
 
@@ -38,7 +38,7 @@ Install the published core with `python -m pip install newsrag` or install local
 
 ## Scope and limitations
 
-Version 0.3.0 uses an in-memory retrieval index with local JSON snapshots and optional SQLite source persistence. It is not a production crawler or fact-checker. Plain-text ingestion and synchronous callable adapters are the core; optional guarded single-page HTTPS fetching is available with `newsrag[web]`. OCR for scanned PDFs, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Arabic light stemming is optional with `newsrag[arabic]`, not full morphology. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
+Version 0.3.1 uses an in-memory retrieval index with local JSON snapshots and optional SQLite source persistence. It is not a production crawler or fact-checker. Plain-text ingestion and synchronous callable adapters are the core; optional guarded single-page HTTPS fetching is available with `newsrag[web]`. OCR for scanned PDFs, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Arabic light stemming is optional with `newsrag[arabic]`, not full morphology. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
 
 
 ## Quality checks
