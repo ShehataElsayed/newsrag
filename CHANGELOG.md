@@ -21,3 +21,4 @@
 - Reject non-finite ranking configuration, nonnumeric embedding values and invalid source metadata with ValidationError.
 - Add an awaitable façade that runs synchronous provider calls in worker threads and serializes operations per instance; it is not a native async provider contract.
 - Keep the wrapped index serialized when a caller cancels a running worker-thread operation; cancellation does not stop provider work already underway.
+- Add `remove(source_id)` in the sync core and awaitable façade for explicit source deletion.
