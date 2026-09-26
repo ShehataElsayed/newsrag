@@ -47,3 +47,11 @@ class TestAsyncFacade(unittest.TestCase):
             hits = await facade.search("slow fast", top_k=2)
             self.assertEqual({hit.source_id for hit in hits}, {"slow", "fast"})
         asyncio.run(run())
+
+    def test_remove(self):
+        async def run():
+            facade = AsyncNewsroomRAG(NewsroomRAG())
+            await facade.add(Source("a", "A", "alpha"))
+            await facade.remove("a")
+            self.assertFalse(await facade.search("alpha"))
+        asyncio.run(run())
