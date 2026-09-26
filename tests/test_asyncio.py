@@ -22,3 +22,28 @@ class TestAsyncFacade(unittest.TestCase):
             await asyncio.gather(*(rag.add(Source(str(i), str(i), "alpha")) for i in range(10)))
             self.assertEqual(len(await rag.search("alpha", top_k=10)), 10)
         asyncio.run(run())
+
+    def test_cancelled_call_does_not_race_next_write(self):
+        import threading
+        started = threading.Event()
+        release = threading.Event()
+        def embed(texts):
+            if texts[0] == "slow":
+                started.set()
+                release.wait(timeout=3)
+            return [[1.0] for _ in texts]
+        async def run():
+            facade = AsyncNewsroomRAG(NewsroomRAG(embed=embed))
+            task = asyncio.create_task(facade.add(Source("slow", "Slow", "slow")))
+            await asyncio.to_thread(started.wait, 3)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            fast = asyncio.create_task(facade.add(Source("fast", "Fast", "fast")))
+            await asyncio.sleep(.05)
+            self.assertFalse(fast.done())
+            release.set()
+            await asyncio.wait_for(fast, 3)
+            hits = await facade.search("slow fast", top_k=2)
+            self.assertEqual({hit.source_id for hit in hits}, {"slow", "fast"})
+        asyncio.run(run())
