@@ -177,6 +177,14 @@ class NewsroomRAG:
         self._chunks.extend(chunks)
         return self
 
+    def remove(self, source_id: str) -> NewsroomRAG:
+        """Remove a source and all its chunks; raise on unknown ID."""
+        if source_id not in self._sources:
+            raise ValidationError("Unknown source ID")
+        self._chunks = [c for c in self._chunks if c.source.id != source_id]
+        del self._sources[source_id]
+        return self
+
     def replace(self, source: Source) -> NewsroomRAG:
         # Prepare new chunks first: a failing embed call preserves old corpus.
         candidate = [_Chunk(source, text, start, end, tokens=_terms(text))
