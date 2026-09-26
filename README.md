@@ -1,6 +1,6 @@
 # NewsRAG by Shehata El-sayed
 
-A small, auditable Python RAG toolkit for journalistic research. This is a private v0.2 prototype, not a PyPI release. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
+A small, auditable Python RAG toolkit for journalistic research. This is a v0.2 prototype. It has not been released on PyPI. Python 3.10+; standard library core. Licensed under Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
 
