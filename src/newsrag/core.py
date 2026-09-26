@@ -147,8 +147,9 @@ class NewsroomRAG:
                  generate: Generator | None = None,
                  chunk_size: int = 900, overlap: int = 100,
                  recency_half_life_days: float | None = None,
-                 lexical_weight: float = 0.65,
+                 lexical_weight: float = 0.2,
                  rerank: Reranker | None = None,
+                 tokenize: Callable[[str], list[str]] | None = None,
                  clock: Callable[[], datetime] | None = None):
         if chunk_size < 100 or not 0 <= overlap < chunk_size // 2:
             raise ValidationError("chunk_size >= 100 and 0 <= overlap < chunk_size/2 required")
@@ -157,6 +158,7 @@ class NewsroomRAG:
         if not isfinite(lexical_weight) or not 0 <= lexical_weight <= 1:
             raise ValidationError("lexical_weight must be between 0 and 1")
         self.embed, self.generate, self.rerank = embed, generate, rerank
+        self.tokenize = tokenize or _terms
         self.chunk_size, self.overlap = chunk_size, overlap
         self.recency_half_life_days = recency_half_life_days
         self.lexical_weight = lexical_weight
@@ -167,7 +169,7 @@ class NewsroomRAG:
     def add(self, *sources: Source) -> NewsroomRAG:
         if len({s.id for s in sources}) != len(sources) or any(s.id in self._sources for s in sources):
             raise ValidationError("Source IDs must be unique; use replace() to update")
-        chunks = [_Chunk(s, text, start, end, tokens=_terms(text))
+        chunks = [_Chunk(s, text, start, end, tokens=self.tokenize(text))
                   for s in sources for text, start, end in
                   _chunks(s.text, self.chunk_size, self.overlap)]
         if self.embed and chunks:
@@ -187,7 +189,7 @@ class NewsroomRAG:
 
     def replace(self, source: Source) -> NewsroomRAG:
         # Prepare new chunks first: a failing embed call preserves old corpus.
-        candidate = [_Chunk(source, text, start, end, tokens=_terms(text))
+        candidate = [_Chunk(source, text, start, end, tokens=self.tokenize(text))
                      for text, start, end in _chunks(source.text, self.chunk_size, self.overlap)]
         if self.embed and candidate:
             self._assign_vectors(candidate, self.embed([c.text for c in candidate]))
@@ -221,7 +223,7 @@ class NewsroomRAG:
                       and (after is None or c.source.published_at is not None and c.source.published_at >= after)]
         if not candidates:
             return ()
-        terms = _terms(query)
+        terms = self.tokenize(query)
         avgdl = sum(len(c.tokens) for c in candidates) / len(candidates) or 1
         df = {term: sum(term in c.tokens for c in candidates) for term in set(terms)}
         qvec = None
@@ -230,7 +232,10 @@ class NewsroomRAG:
             if len(qvectors) != 1 or not qvectors[0] or any(not isinstance(x, (int, float)) or not isfinite(x) for x in qvectors[0]):
                 raise ValidationError("Embedder must return one finite, non-empty query vector")
             qvec = qvectors[0]
-        scored: list[tuple[float, _Chunk]] = []
+        # Normalize each signal to its strongest candidate before blending.
+        # Raw BM25 magnitudes and cosine similarities are not comparable.
+        lexical_scores: list[float] = []
+        semantic_scores: list[float] = []
         for c in candidates:
             score = 0.0
             for term in set(terms):
@@ -239,7 +244,16 @@ class NewsroomRAG:
                     idf = log(1 + (len(candidates) - df[term] + .5)/(df[term] + .5))
                     score += idf * (freq * 2.2)/(freq + 1.2 * (.25 + .75 * len(c.tokens)/avgdl))
             semantic = max(0.0, _cosine(qvec, c.vector)) if qvec is not None and c.vector is not None else 0.0
-            blended = self.lexical_weight * score + (1-self.lexical_weight) * semantic if self.embed else score
+            lexical_scores.append(score)
+            semantic_scores.append(semantic)
+        max_lexical = max(lexical_scores, default=0.0)
+        max_semantic = max(semantic_scores, default=0.0)
+        scored: list[tuple[float, _Chunk]] = []
+        for c, lexical, semantic in zip(candidates, lexical_scores, semantic_scores):
+            normalized_lexical = lexical / max_lexical if max_lexical else 0.0
+            normalized_semantic = semantic / max_semantic if max_semantic else 0.0
+            blended = (self.lexical_weight * normalized_lexical +
+                       (1-self.lexical_weight) * normalized_semantic) if self.embed else lexical
             if blended <= 0:
                 continue
             if self.recency_half_life_days and c.source.published_at:
