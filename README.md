@@ -67,3 +67,7 @@ Further reading: [architecture and provider contract](docs/architecture.md), [re
 An optional provider illustration is in [`examples/openai_adapter.py`](examples/openai_adapter.py). It requires a separately installed SDK and the user's own provider credentials; no credentials belong in this repository. Model names and SDK behavior can change, so validate an adapter against its provider's current documentation before using it.
 
 For a future public release, see [PyPI Trusted Publishing setup](docs/publishing.md). No API token is needed in GitHub Actions; the repository owner must configure the matching pending publisher in the intended PyPI account and review the tagged release.
+
+### Optional evidence reranking
+
+Pass `rerank=lambda query, evidence: ...` when you have a trusted reranking function. The function receives the initially retrieved evidence and must return a permutation of those same objects; new or rewritten passages are rejected. Citation IDs are reassigned after the new order. Reranking cannot recover evidence absent from the initial `top_k`, and does not check whether an answer is true. Arabic normalization includes common hamza, ta marbuta, alef maqsura and Persian keyboard letter variants; it is still not Arabic stemming or morphological analysis.
