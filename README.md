@@ -90,3 +90,5 @@ with SQLiteSourceStore("research.db") as store:
 ```
 
 SQLite stores source text and metadata transactionally and creates a new database with mode 0600 on POSIX. It does not persist embeddings or an already-built search index: rebuild chunks and vectors at startup, with provider costs if configured. The file is not encrypted; protect and back it up with SQLite's backup API rather than copying it while live. Do not use this as a multiwriter service without an application-level concurrency plan.
+
+To make a consistent backup while the database is open, use `store.backup("research-backup.db")`. It refuses to overwrite an existing destination and creates the backup with mode 0600 on POSIX. Protect both files: neither is encrypted.
