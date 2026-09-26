@@ -10,4 +10,4 @@ from .storage import load_sources, save_sources
 from .web import source_from_url
 
 __all__ = ["Answer", "ArabicLightTokenizer", "AsyncNewsroomRAG", "Evidence", "MultilingualEmbedder", "NewsroomRAG", "RetrievalCase", "RetrievalScore", "SQLiteSourceStore", "Source", "ValidationError", "evaluate_retrieval", "load_sources", "save_sources", "source_from_html", "source_from_pdf", "source_from_url"]
-__version__ = "0.3.0"
+__version__ = "0.3.1"
