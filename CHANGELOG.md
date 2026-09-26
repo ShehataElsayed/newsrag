@@ -20,3 +20,4 @@
 - Add a small deterministic retrieval evaluation harness with source-level recall@k, hit rate@k, mean reciprocal rank and missed queries; document its limits.
 - Reject non-finite ranking configuration, nonnumeric embedding values and invalid source metadata with ValidationError.
 - Add an awaitable façade that runs synchronous provider calls in worker threads and serializes operations per instance; it is not a native async provider contract.
+- Keep the wrapped index serialized when a caller cancels a running worker-thread operation; cancellation does not stop provider work already underway.
