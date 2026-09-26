@@ -24,5 +24,7 @@ setup(
                  "Topic :: Text Processing :: Indexing"],
     packages=find_packages("src"),
     package_dir={"": "src"}, python_requires=">=3.10",
-    install_requires=[], extras_require={"pdf": ["pypdf>=5,<7"]},
+    install_requires=[], extras_require={"pdf": ["pypdf>=5,<7"],
+                                      "multilingual": ["sentence-transformers>=3,<6"],
+                                      "arabic": ["snowballstemmer>=2.2,<4"]},
 )
