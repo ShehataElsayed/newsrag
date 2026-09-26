@@ -3,7 +3,7 @@ from pathlib import Path
 from setuptools import find_packages, setup
 
 setup(
-    name="newsrag", version="0.3.0",
+    name="newsrag", version="0.3.1",
     description="Auditable, provider-neutral RAG for newsroom research",
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
