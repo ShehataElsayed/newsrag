@@ -1,6 +1,6 @@
 # NewsRAG by Shehata El-sayed
 
-An auditable Python RAG toolkit for journalistic source research. Version 0.3.1 offers optional multilingual retrieval, Arabic light stemming, SQLite source storage, and guarded single-page URL ingestion. It does not verify generated claims or replace editorial source checks. Python 3.10+; Apache-2.0 (see LICENSE and NOTICE).
+An auditable Python RAG toolkit for journalistic source research. Version 0.4.0 offers optional multilingual retrieval, Arabic light stemming, SQLite source storage, and guarded single-page URL ingestion. It does not verify generated claims or replace editorial source checks. Python 3.10+; Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
 
@@ -36,9 +36,19 @@ Install the published core with `python -m pip install newsrag` or install local
 - Generator prompt asks for bracketed evidence IDs (`[E1]`). IDs are checked against retrieved passages and unknown IDs flagged. This does **not** verify the claims, the source's truth, or whether cited passages support each sentence.
 - No-match answers abstain. Source text is marked untrusted, but prompt injection remains a risk with any model. Do not feed confidential material to a third-party provider without permission. Review original sources, licensing, quotes, dates, and contested claims before publishing.
 
+## Experimental verification lab (0.4.0)
+
+Version 0.4.0 adds `newsrag.lab*` and `newsrag.neural*` modules (neighbour retrieval, agreement gate, contradiction and drift checks, few-shot verdict adapters, ranking, statistics helpers). The optional `newsrag[neural]` extra needs NumPy.
+
+- Everything in the lab is experimental. Every output carries `validated_for_release=False`, and no module reports a truth probability.
+- No trained weights, datasets or fact-check text are shipped. The experiments behind the lab used a private, non-commercial corpus that is not distributed.
+- Measured so far (rolling-origin test, 6,831 claims, platform verdict labels from professional fact-checkers, not independent review): macro-F1 about 0.37 to 0.39 for the best systems against 0.21 for the majority baseline. The gate added about 0.02 over a plain neighbour vote and the interval includes zero. The rare classes (for example True and Sarcasm) are essentially unsolved.
+- Platform verdict labels are not equivalent across fact-checkers.
+- Autonomous use stays off. It would need at least 500 independently reviewed cases.
+
 ## Scope and limitations
 
-Version 0.3.1 uses an in-memory retrieval index with local JSON snapshots and optional SQLite source persistence. It is not a production crawler or fact-checker. Plain-text ingestion and synchronous callable adapters are the core; optional guarded single-page HTTPS fetching is available with `newsrag[web]`. OCR for scanned PDFs, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Arabic light stemming is optional with `newsrag[arabic]`, not full morphology. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
+Version 0.4.0 uses an in-memory retrieval index with local JSON snapshots and optional SQLite source persistence. It is not a production crawler or fact-checker. Plain-text ingestion and synchronous callable adapters are the core; optional guarded single-page HTTPS fetching is available with `newsrag[web]`. OCR for scanned PDFs, persistent vector indexes, source deduplication, named provider packages, automated entailment checking, and benchmark-based tuning are future work. Arabic light stemming is optional with `newsrag[arabic]`, not full morphology. No claim that this works with every provider out of the box: providers must offer embeddings with stable vector dimensions and/or text generation and be wrapped in the two simple callables. The toy example.org URLs are not real news sources.
 
 
 ## Quality checks

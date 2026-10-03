@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from statistics import mean
+from typing import Any
 
 from .core import NewsroomRAG, ValidationError
 
@@ -28,7 +29,7 @@ class RetrievalScore:
     reciprocal_rank: float
     missed_queries: tuple[str, ...]
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "cases": self.cases,
             "top_k": self.top_k,
