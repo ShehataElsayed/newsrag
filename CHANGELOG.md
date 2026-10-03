@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 - 2026-10-03
+
+- Add experimental verification lab modules (`newsrag.lab`, `lab_*`, `neural`, `neural_components`) and the optional `neural` extra (NumPy). All outputs are `validated_for_release=False`; no weights or data are shipped.
+- Add 17 test files for the lab modules; tighten return types in `core` and `evaluation`.
+- README documents measured results only, against the majority baseline.
+
 ## 0.3.1 - 2026-09-26
 
 - Update the published package description to match current 0.3 features and limits; no retrieval or API behavior changes from 0.3.0.
