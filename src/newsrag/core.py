@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from math import exp, isfinite, log, sqrt
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class ValidationError(ValueError):
@@ -59,7 +59,7 @@ class Answer:
     # True means citation references exist, not that assertions are true.
     citation_refs_valid: bool
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, Any]:
         def iso(t: datetime | None) -> str | None:
             return t.isoformat() if t else None
         return {
