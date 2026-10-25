@@ -28,6 +28,19 @@ print(answer.text, answer.evidence, answer.warnings)
 
 Install the published core with `python -m pip install newsrag` or install locally with `python -m pip install .`. Run tests with `PYTHONPATH=src python -m unittest discover -s tests -v`, and run `PYTHONPATH=src python examples/quickstart.py` from this directory. The core does not make network calls by default; the optional URL fetcher, model download, and your provider adapters can.
 
+## Optional Gemini provider (0.5.0)
+
+`newsrag.gemini.GeminiProvider` wires Google's Gemini API into the `generate` and `embed` hooks with no extra dependencies:
+
+```python
+from newsrag import GeminiProvider, NewsroomRAG, Source
+
+provider = GeminiProvider("YOUR_API_KEY")  # defaults: gemini-3.1-flash-lite + gemini-embedding-001 (live-checked 2026-10-25)
+rag = NewsroomRAG(embed=provider.embed, generate=provider.generate).add(...)
+```
+
+Text sent to these hooks leaves your machine and is processed by Google under its API terms; use it only with sources you may share. The key is read from your environment or secret store, never written to this repository.
+
 ## Newsroom-specific controls
 
 - Every source carries an ID, title, original URL, publisher, type, timestamp with timezone, and original text. Search results retain exact offsets and excerpts for audit.
@@ -45,6 +58,24 @@ Version 0.4.0 adds `newsrag.lab*` and `newsrag.neural*` modules (neighbour retri
 - Measured so far (rolling-origin test, 6,831 claims, platform verdict labels from professional fact-checkers, not independent review): macro-F1 about 0.37 to 0.39 for the best systems against 0.21 for the majority baseline. The gate added about 0.02 over a plain neighbour vote and the interval includes zero. The rare classes (for example True and Sarcasm) are essentially unsolved.
 - Platform verdict labels are not equivalent across fact-checkers.
 - Autonomous use stays off. It would need at least 500 independently reviewed cases.
+
+## Experimental assistant port (0.6.0)
+
+`newsrag.assist` ports the question-only assistant decision ladder into the library: draft, per-claim lexical support against source passages, a guarded rewrite that is re-verified against its own extracted claims, and an answer/extractive/insufficient decision with a criteria checklist. Support is a lexical match with number and negation-parity guards — an automated signal, not entailment validation.
+
+```python
+from newsrag import assist
+
+rag = NewsroomRAG(generate=my_llm).add(...)   # needs the generate hook
+result = assist(rag, "سؤالك هنا")
+# result.decision: "answer" | "extractive" | "insufficient"; unsupported claims are never shown bare
+```
+
+Experimental: `validated_for_release` is always False and the module carries no calibrated claim-support guarantee.
+
+Token-truncated model output is handled fail-closed: an unterminated answer string is cut back to the last sentence-final punctuation (a tail cut mid-number, mid-negation or mid-citation could otherwise verify falsely), claim lists keep only fully closed strings, and a truncation warning appears in `result.warnings`. Salvage can only shrink content; every claim still needs corpus support.
+
+The same decision ladder runs (newer, still experimental) inside the public Arabic Open Sources Guide: <https://github.com/ShehataElsayed/osint-arabic-sources>.
 
 ## Scope and limitations
 

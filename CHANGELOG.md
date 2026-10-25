@@ -1,4 +1,24 @@
+## Unreleased
+
+- assist(): fail-closed salvage of token-truncated model JSON. An unterminated
+  answer string is cut back to the last sentence-final punctuation (a tail cut
+  mid-number/mid-negation/mid-citation could otherwise verify falsely);
+  claims keep only fully closed strings; salvage only ever shrinks content and
+  every claim still needs corpus support. A truncation warning is surfaced in
+  AssistResult.warnings. Regression tests: mid-sentence cut, fully truncated
+  fragment (insufficient), closed-strings-only claims, dangling escape.
+
 # Changelog
+
+## 0.6.0 - 2026-10-25
+
+- Add `newsrag.assist`: experimental port of the question-only assistant decision ladder (draft, per-claim lexical support with number/negation-parity guards, guarded rewrite re-verified against its own extracted claims, answer/extractive/insufficient decision, criteria checklist). `validated_for_release` stays False; lexical support is an automated signal, not entailment.
+- 6 new tests with fake transports; full suite 138 tests.
+
+## 0.5.0 - 2026-10-25
+
+- Add `newsrag.gemini.GeminiProvider`: a dependency-free adapter that supplies the `generate` and `embed` callables from Google's Gemini API (`urllib` only, injectable transport, response-shape validation, no key logging). Default model names live-checked against the API on 2026-10-25: `gemini-3.1-flash-lite` + `gemini-embedding-001` (earlier guessed IDs were corrected after live probing); pass explicit names to pin or update them. As with any external provider, only send sources you are allowed to share.
+- 6 new tests cover key/name validation, request shape, embedding count and numeric checks, and an end-to-end `NewsroomRAG` run with a stubbed transport.
 
 ## 0.4.0 - 2026-10-03
 
