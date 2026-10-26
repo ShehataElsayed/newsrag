@@ -1,5 +1,7 @@
 # NewsRAG by Shehata El-sayed
 
+> **License:** All rights reserved from this version onward; no use, copying, modification, or redistribution without the owner's prior written permission. Earlier releases remain under their original license (see LICENSE).
+
 An auditable Python RAG toolkit for journalistic source research. Version 0.4.0 offers optional multilingual retrieval, Arabic light stemming, SQLite source storage, and guarded single-page URL ingestion. It does not verify generated claims or replace editorial source checks. Python 3.10+; Apache-2.0 (see LICENSE and NOTICE).
 
 ## Example
@@ -143,3 +145,4 @@ For light Arabic stemming, install `pip install 'newsrag[arabic]'` and use `toke
 ### Single-page URL ingestion (optional)
 
 Install `pip install 'newsrag[web]'` and call `source_from_url(id=..., title=..., url='https://publisher.example/story', allowed_hosts=frozenset({'publisher.example'}))`. It checks the exact publisher host allowlist, public DNS, HTTPS certificate, robots.txt permission, response size (2 MB), content type, and redirects (rejected), then extracts article text with Trafilatura. This is a single-page fetcher, not a crawler. It refuses a positive crawl delay so callers can schedule the fetch themselves. Publisher terms, licensing, origin and editorial authenticity are still the caller's responsibility. Do not point it at private infrastructure or untrusted hosts. Some sites block bots or cannot be extracted and require a human review. No article text is added to this repository.
+
