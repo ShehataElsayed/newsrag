@@ -15,6 +15,10 @@
 
 # Changelog
 
+## 0.6.4 - 2026-10-26
+
+- CI: install the arabic and web extras in the verify/release jobs; three tests exercise ArabicLightTokenizer and newsrag.web and fail on ImportError when the extras are absent. No package behavior change. v0.6.3 is superseded before any PyPI publication.
+
 ## 0.6.3 - 2026-10-26
 
 - collector: meta-tag regex inline flags moved to compile flags; the mid-pattern inline flags are a hard re.error on Python 3.11+ at import. No behavior change. v0.6.2 is superseded before any PyPI publication.
