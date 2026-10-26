@@ -15,6 +15,10 @@
 
 # Changelog
 
+## 0.6.2 - 2026-10-26
+
+- mypy configuration: optional integrations (Pillow, snowballstemmer, sentence-transformers) are guarded optional imports and now carry ignore-missing-imports overrides, since they are not installed in CI. No package behavior change. v0.6.1 is superseded before any PyPI publication.
+
 ## 0.6.1 - 2026-10-26
 
 - CI compliance for the 0.6.0 tree: ruff lint and mypy type checks pass again across Python 3.10-3.13 (import sorting, context-managed file handles, explicit subprocess check argument, Optional narrowing, loop-variable disambiguation, ruff target-version pinned to py310). No behavior change; full suite 253 tests.
