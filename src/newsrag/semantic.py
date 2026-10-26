@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 RELATIONS = ("supports", "contradicts", "different_scope", "insufficient")
 DIMENSIONS = ("entity", "measure", "time", "population", "attribution", "direction", "meaning")
@@ -76,9 +77,7 @@ def verify_relation(claim: str, support: str, generate: Callable[..., str]) -> d
     if rel not in RELATIONS:
         return {"relation": "insufficient", "dimension": None,
                 "reason": "model verdict unusable; treated as unknown", "valid": False}
-    if rel in ("supports", "insufficient"):
-        dim = None
-    elif dim not in DIMENSIONS:
+    if rel in ("supports", "insufficient") or dim not in DIMENSIONS:
         dim = None
     return {"relation": rel, "dimension": dim, "reason": reason, "valid": True}
 
@@ -159,7 +158,7 @@ _MULT = (("مليار", 1e9), ("billion", 1e9), ("ملايين", 1e6), ("ملي�
 
 
 def _canon_num(value: float) -> str:
-    return str(int(value)) if value == int(value) else ("%.6f" % value).rstrip("0")
+    return str(int(value)) if value == int(value) else f"{value:.6f}".rstrip("0")
 
 
 def _numbers(nums: Any) -> set[str]:
@@ -211,14 +210,16 @@ _EXCACHE_PATH: str | None = None
 
 def _excache_get(key: str):
     global _EXCACHE, _EXCACHE_PATH
-    import os, json as _json, hashlib as _h
+    import json as _json
+    import os
     if _EXCACHE is None:
         _EXCACHE_PATH = os.environ.get("NEWSRAG_EXCACHE")
         _EXCACHE = {}
         if _EXCACHE_PATH and os.path.exists(_EXCACHE_PATH):
             try:
-                _EXCACHE = _json.load(open(_EXCACHE_PATH))
-            except Exception:
+                with open(_EXCACHE_PATH) as fh:
+                    _EXCACHE = _json.load(fh)
+            except Exception:  # noqa: BLE001 - corrupt cache must degrade to empty, never crash
                 _EXCACHE = {}
     return _EXCACHE.get(key)
 
@@ -226,11 +227,13 @@ def _excache_get(key: str):
 def _excache_put(key: str, value: Any) -> None:
     import json as _json
     _excache_get(key)  # ensure loaded
+    assert _EXCACHE is not None  # _excache_get always initializes it
     _EXCACHE[key] = value
     if _EXCACHE_PATH:
         try:
-            _json.dump(_EXCACHE, open(_EXCACHE_PATH, "w"), ensure_ascii=False)
-        except Exception:
+            with open(_EXCACHE_PATH, "w") as fh:
+                _json.dump(_EXCACHE, fh, ensure_ascii=False)
+        except Exception:  # noqa: BLE001, S110 - cache persistence is best-effort
             pass
 
 
@@ -244,14 +247,17 @@ def _decomp_cache_key(question: str) -> str:
     a change to any of them invalidates stale entries. Distinct namespace from
     facet-extraction keys; _DECOMP_STATS records hit/fresh counts for cost
     accounting."""
-    import hashlib as _hh, os
+    import hashlib as _hh
+    import os
+
     from .orchestrate import _DECOMPOSE_PROMPT
     h = _hh.md5()
     h.update(question.encode())
     h.update(_DECOMPOSE_PROMPT.encode())
     gf = os.environ.get("NEWSRAG_CLAIMS_GRAMMAR", "examples/adversarial/claims.gbnf")
     try:
-        h.update(open(gf, "rb").read())
+        with open(gf, "rb") as fh:
+            h.update(fh.read())
     except OSError:
         h.update(b"no-grammar")
     h.update(os.environ.get("NEWSRAG_MODEL_ID", "qwen15.gguf").encode())
@@ -263,17 +269,19 @@ def _cache_key(text: str) -> str:
     """Cache key binds model, prompt, grammar, facet schema AND input text:
     a fix to any of them invalidates old entries instead of replaying stale
     extractions as fresh inference."""
-    import hashlib as _hh, os
+    import hashlib as _hh
+    import os
     h = _hh.md5()
     h.update(text.strip()[:700].encode())
     h.update(_FACET_PROMPT.encode())
     gf = os.environ.get("NEWSRAG_FACET_GRAMMAR", "examples/adversarial/facet.gbnf")
     try:
-        h.update(open(gf, "rb").read())
+        with open(gf, "rb") as fh:
+            h.update(fh.read())
     except OSError:
         h.update(b"no-grammar")
     h.update(os.environ.get("NEWSRAG_MODEL_ID", "qwen15.gguf").encode())
-    h.update("metric_kind,currency,figure_source,recordline,enstat,domains,geo,unit,enreach,enheld,rate,enrec,enest,v12".encode())  # v12: en estimated-at parser (GASTAT headline estimates)  # v4: deterministic record-line parser added; stale LLM parses of record lines invalid
+    h.update(b"metric_kind,currency,figure_source,recordline,enstat,domains,geo,unit,enreach,enheld,rate,enrec,enest,v12")  # v12: en estimated-at parser (GASTAT headline estimates)  # v4: deterministic record-line parser added; stale LLM parses of record lines invalid
     return h.hexdigest()
 
 
@@ -525,7 +533,7 @@ def extract_facets(text: str, generate: Callable[..., str]) -> dict[str, Any] | 
             obj = _extract_json(str(generate(prompt)))  # one retry: 1.5B emits
             # truncated/unparseable JSON intermittently; a second sample is cheap
             # next to a false "extraction failed" classification (core 14.1 sighting)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - generation failure is classified, not fatal
         # generation-side failure (e.g. per-candidate time budget exceeded on
         # slow hardware): classify, negative-cache with the reason, abstain.
         _excache_put(_ck, {"_failed": True, "_reason": f"generate-error:{type(exc).__name__}"})
@@ -659,7 +667,8 @@ def compare_facets(claim_f: dict[str, Any], support_f: dict[str, Any]) -> dict[s
         # one-sided bridge: the indicator-less side may still be ABOUT a
         # campaign (cue words in its entity/measure/population) - then a
         # campaign_* evidence indicator is scope-compatible, not a mismatch.
-        none_side, other = (claim_f, si) if not ci else (support_f, ci)
+        none_side, other_raw = (claim_f, si) if not ci else (support_f, ci)
+        other = str(other_raw or "")
         blob_n = _norm(" ".join(str(none_side.get(k) or "") for k in ("entity", "measure", "population")))
         _CUE = ("حملة", "حملات", "حساب", "منشور", "تغريد", "campaign", "account", "post", "tweet")
         if other.startswith("campaign_") and any(w in blob_n for w in _CUE):
@@ -706,13 +715,13 @@ def compare_facets(claim_f: dict[str, Any], support_f: dict[str, Any]) -> dict[s
     if bool(cy) != bool(sy):
         return {"relation": "insufficient", "dimension": None, "reason_code": "year_one_sided",
                 "reason": "year stated on one side only; cannot confirm the period, abstaining"}
-    cm, sm = {m for m, _ in ct if m}, {m for m, _ in st if m}
-    if cm and not sm:
+    cm_set, sm_set = {m for m, _ in ct if m}, {m for m, _ in st if m}
+    if cm_set and not sm_set:
         # claim names a month, evidence gives only the year: cannot confirm the
         # month - abstain (review: month-0 is "unspecified", not a month)
         return {"relation": "insufficient", "dimension": None, "reason_code": "month_one_sided",
                 "reason": "claim names a month but evidence states only the year; abstaining"}
-    if cm and sm and not (cm & sm):
+    if cm_set and sm_set and not (cm_set & sm_set):
         return {"relation": "different_scope", "dimension": "time", "reason_code": "period_differs",
                 "reason": f"period differs: claim={claim_f.get('time_period')!r} vs evidence={support_f.get('time_period')!r}"}
     # year-only claim with month-specific evidence in the same year is

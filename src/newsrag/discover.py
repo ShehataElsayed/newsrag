@@ -12,12 +12,11 @@ so the gap is visible instead of silently dropped.
 from __future__ import annotations
 
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 _WORD = re.compile(r"[A-Za-zء-ي]{3,}")
-_STOP = set("""ما ماهو ماهي كم هل في من على إلى عن أن إن كان كانت هذا هذه ذلك التي الذي
-the and for with what which how many much did does are was were has have had
-سنة شهر عام سبتمبر أغسطس اكتوبر أكتوبر""".split())
+_STOP = set({"ما", "ماهو", "ماهي", "كم", "هل", "في", "من", "على", "إلى", "عن", "أن", "إن", "كان", "كانت", "هذا", "هذه", "ذلك", "التي", "الذي", "the", "and", "for", "with", "what", "which", "how", "many", "much", "did", "does", "are", "was", "were", "has", "have", "had", "سنة", "شهر", "عام", "سبتمبر", "أغسطس", "اكتوبر", "أكتوبر"})
 
 
 # Bounded bilingual glossary for AR<->EN scope matching: the library takes

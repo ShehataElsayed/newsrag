@@ -25,7 +25,8 @@ endpoint is not deployment permission.
 from __future__ import annotations
 
 import json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from urllib import request
 
 from .core import ValidationError
@@ -69,7 +70,7 @@ class QwenProvider:
         self.model_reported: str | None = None
 
     def _post(self, req: request.Request) -> Any:
-        with request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310 - scheme/host validated above
+        with request.urlopen(req, timeout=self.timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def generate(self, prompt: str) -> str:
@@ -141,7 +142,7 @@ def llamacpp_generate(model_path: str, *, binary: str = "llama-completion",
             # running inside interactive terminals.
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout,
-                stdin=subprocess.DEVNULL)
+                stdin=subprocess.DEVNULL, check=False)
         except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
             raise ValidationError(f"llama.cpp run failed: {exc}") from exc
         out = proc.stdout or ""

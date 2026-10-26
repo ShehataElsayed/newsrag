@@ -1,29 +1,28 @@
+import os
+import tempfile
 import unittest
-from newsrag import Source
-from newsrag.refresh import RefreshableStore, RefreshReport
-from newsrag.forensics import inspect_media, INDICATORS_NOT_PROOF
-from newsrag import ValidationError
-import tempfile, os
+
+from newsrag import Source, ValidationError
+from newsrag.forensics import INDICATORS_NOT_PROOF, inspect_media
+from newsrag.refresh import RefreshableStore
+
 
 def s(i, text):
     return Source(id=i, title=f"عنوان {i}", text=text)
 
 class RefreshTests(unittest.TestCase):
     def test_refresh_adds_and_reports(self):
-        with tempfile.TemporaryDirectory() as d:
-            with RefreshableStore(os.path.join(d, "s.db")) as st:
+        with tempfile.TemporaryDirectory() as d, RefreshableStore(os.path.join(d, "s.db")) as st:
                 rep = st.refresh([s("a", "نص أول طويل بما يكفي"), s("b", "نص ثان طويل بما يكفي")])
                 self.assertEqual((rep.received, rep.added, rep.updated), (2, 2, 0))
                 self.assertTrue(rep.as_dict()["prototype"])
     def test_refresh_updates_existing_and_dedupes_content(self):
-        with tempfile.TemporaryDirectory() as d:
-            with RefreshableStore(os.path.join(d, "s.db")) as st:
+        with tempfile.TemporaryDirectory() as d, RefreshableStore(os.path.join(d, "s.db")) as st:
                 st.refresh([s("a", "نفس النص تماما بما يكفي")])
                 rep = st.refresh([s("a", "نص محدث مختلف بما يكفي"), s("b", "نفس النص تماما بما يكفي")])
                 self.assertEqual((rep.updated, rep.added, rep.skipped_duplicates), (1, 0, 1))
     def test_refresh_rejects_invalid_items_by_name(self):
-        with tempfile.TemporaryDirectory() as d:
-            with RefreshableStore(os.path.join(d, "s.db")) as st:
+        with tempfile.TemporaryDirectory() as d, RefreshableStore(os.path.join(d, "s.db")) as st:
                 rep = st.refresh(["not-a-source"])
                 self.assertEqual(rep.added, 0)
                 self.assertEqual(len(rep.rejected), 1)

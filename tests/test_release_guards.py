@@ -1,13 +1,18 @@
 """Targeted regressions for the review-driven guards (
 new guards without new tests are a coverage gap). Pure-function tests, no LLM."""
 import sys
+
 sys.path.insert(0, 'src')
 
-from newsrag.orchestrate import (_THRESHOLD, _drop_delta_figures,
-                                 prefer_measure, dedup_answer_findings)
-from newsrag.semantic import _en_estimated_facets
-from newsrag.narrate import _render_answer, _period_ar
 from newsrag.collector import html_to_text2
+from newsrag.narrate import _period_ar, _render_answer
+from newsrag.orchestrate import (
+    _THRESHOLD,
+    _drop_delta_figures,
+    dedup_answer_findings,
+    prefer_measure,
+)
+from newsrag.semantic import _en_estimated_facets
 
 
 def test_threshold_regex_marks_bounds_not_estimates():
@@ -183,6 +188,7 @@ def test_extraction_generate_error_negative_cached():
     negative-cached with its reason: a slow candidate is not re-attempted at
     full cost on every resume, and the failure reason stays inspectable."""
     import importlib
+
     import newsrag.semantic as sem
     importlib.reload(sem)
     seen = {"calls": 0}
@@ -191,7 +197,8 @@ def test_extraction_generate_error_negative_cached():
         seen["calls"] += 1
         raise TimeoutError("budget")
 
-    import os, tempfile
+    import os
+    import tempfile
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
         path = f.name
     os.environ["NEWSRAG_EXCACHE"] = path
@@ -200,7 +207,8 @@ def test_extraction_generate_error_negative_cached():
         assert sem.extract_facets("unique text for timeout guard 123", boom) is None
         assert seen["calls"] == 1  # second call served from negative cache
         import json
-        entry = json.load(open(path))[sem._cache_key("unique text for timeout guard 123")]
+        with open(path) as fh:
+            entry = json.load(fh)[sem._cache_key("unique text for timeout guard 123")]
         assert entry["_failed"] and "TimeoutError" in entry["_reason"]
     finally:
         del os.environ["NEWSRAG_EXCACHE"]
@@ -212,7 +220,10 @@ def test_decompose_cache_key_invalidation():
     """Decompose cache key binds question + model + prompt + grammar + version:
     changing any one invalidates old entries (no stale decomposition replay),
     and hit/fresh accounting is recorded."""
-    import importlib, os, tempfile
+    import importlib
+    import os
+    import tempfile
+
     import newsrag.semantic as sem
     importlib.reload(sem)
     q = "ما معدل التضخم في سبتمبر 2026؟"
@@ -243,7 +254,11 @@ def test_decompose_cache_key_invalidation():
 def test_decompose_hit_fresh_accounting():
     """decompose_question records fresh vs hit counts and serves the second
     identical call from cache without re-invoking the model."""
-    import importlib, os, tempfile, json
+    import importlib
+    import json
+    import os
+    import tempfile
+
     import newsrag.semantic as sem
     importlib.reload(sem)
     import newsrag.orchestrate as orch
@@ -270,8 +285,11 @@ def test_coordination_bar_caption_not_analysis():
     """A coordination claim (حملات منسقة) requires analysis-level coordination
     evidence: a photo caption repeating the slogan, a heading fragment, or a
     shared-sentiment inference are recorded but NOT bound as answers (caption/analysis/inference distinction)."""
-    from newsrag.orchestrate import (_coordination_required, _coordination_grade,
-                                     _is_caption_or_heading)
+    from newsrag.orchestrate import (
+        _coordination_grade,
+        _coordination_required,
+        _is_caption_or_heading,
+    )
     assert _coordination_required("هل وثّقت تحقيقات حملات منسقة ضد المصريين؟")
     assert _coordination_required("Were coordinated campaigns documented?")
     assert not _coordination_required("ما معدل التضخم في سبتمبر 2026؟")

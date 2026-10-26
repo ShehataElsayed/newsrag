@@ -15,6 +15,10 @@
 
 # Changelog
 
+## 0.6.1 - 2026-10-26
+
+- CI compliance for the 0.6.0 tree: ruff lint and mypy type checks pass again across Python 3.10-3.13 (import sorting, context-managed file handles, explicit subprocess check argument, Optional narrowing, loop-variable disambiguation, ruff target-version pinned to py310). No behavior change; full suite 253 tests.
+
 ## 0.6.0 - 2026-10-26
 
 - Add `newsrag.assist`: experimental port of the question-only assistant decision ladder (draft, per-claim lexical support with negation-parity guard, guarded rewrite re-verified against its own extracted claims, answer/extractive/insufficient decision, criteria checklist). `validated_for_release` stays False; lexical support is an automated signal, not entailment.

@@ -3,6 +3,7 @@
 Each test pins one defect found by live audit so it cannot silently return.
 """
 import json
+
 from newsrag.collector import SourceSpec
 from newsrag.narrate import _group, _render_answer
 from newsrag.orchestrate import run_investigation
@@ -106,6 +107,7 @@ def test_recordline_answer_binds_without_prose_guards():
     """Regression: a WB API record line must answer a matching
     question-frame claim directly - no prose period/entity segment needed."""
     import json as _json
+
     from newsrag.collector import SourceSpec
     from newsrag.orchestrate import run_investigation
     q = "ما معدل النمو السنوي للناتج المحلي الإجمالي الحقيقي في السعودية لعام 2024 وفق البنك الدولي؟"
@@ -145,7 +147,7 @@ def test_indicator_taxonomy_wb_macro():
 
 
 def test_en_stat_parser_core_cpi():
-    from newsrag.semantic import extract_facets, _indicator
+    from newsrag.semantic import _indicator, extract_facets
     sent = ("On an annual basis, core CPI inflation recorded 14.1 percent in "
             "September 2026 compared with 14.9 percent in August 2026.")
     f = extract_facets(sent, lambda p: (_ for _ in ()).throw(AssertionError("LLM must not be called")))
@@ -167,8 +169,8 @@ def test_country_differs_is_different_scope():
 
 
 def test_recordline_unit_and_render_precision():
-    from newsrag.semantic import _recordline_facets
     from newsrag.narrate import _render_answer
+    from newsrag.semantic import _recordline_facets
     line = ("indicator.id: NY.GDP.MKTP.KD.ZG; indicator.value: GDP growth (annual %); "
             "country.value: Saudi Arabia; date: 2024; value: 2.64893068308965; decimal: 1")
     f = _recordline_facets(line)
@@ -181,7 +183,7 @@ def test_recordline_unit_and_render_precision():
 
 
 def test_norm_alef_variants():
-    from newsrag.semantic import _norm, _indicator
+    from newsrag.semantic import _indicator, _norm
     assert _norm("أمية") == "امية" and "امية" in _norm("معدل محو الامية")
     assert _indicator({"measure": "معدل محو الامية", "entity": "الامية",
                        "population": "مصر"}) == "literacy"

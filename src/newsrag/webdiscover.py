@@ -15,8 +15,8 @@ import urllib.request
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                      "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"}
 _ENDPOINT = "https://html.duckduckgo.com/html/"
-_RESULT = re.compile(r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', re.S)
-_SNIPPET = re.compile(r'class="result__snippet"[^>]*>(.*?)</a>', re.S)
+_RESULT = re.compile(r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>', re.DOTALL)
+_SNIPPET = re.compile(r'class="result__snippet"[^>]*>(.*?)</a>', re.DOTALL)
 _TAG = re.compile(r"<[^>]+>")
 
 
@@ -37,7 +37,7 @@ def web_search(question: str, *, max_results: int = 8, timeout: float = 30.0,
     data = urllib.parse.urlencode({"q": q}).encode()
     req = urllib.request.Request(_ENDPOINT, data=data, headers=_UA)
     open_fn = opener or urllib.request.urlopen
-    with open_fn(req, timeout=timeout) as resp:  # noqa: S310 - public search endpoint
+    with open_fn(req, timeout=timeout) as resp:
         html = resp.read().decode("utf-8", errors="replace")
     links = _RESULT.findall(html)
     snippets = [_TAG.sub("", s).strip() for s in _SNIPPET.findall(html)]

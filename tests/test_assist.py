@@ -138,7 +138,7 @@ SRC_NUM = Source(id="n", title="بيان صحي", text="أعلنت الوزار�
 
 class AssistNumericGuardTests(unittest.TestCase):
     def _rag(self, claim):
-        script = {"draft": '{"answer":"%s [S1]","claims":["%s"],"unknowns":[]}' % (claim, claim)}
+        script = {"draft": f'{{"answer":"{claim} [S1]","claims":["{claim}"],"unknowns":[]}}'}
         rag = NewsroomRAG(generate=gen(script))
         rag.add(SRC_NUM)
         return rag
@@ -352,11 +352,11 @@ def test_sentence_split_keeps_decimal_numbers_intact():
 
 
 def test_support_accepts_claim_with_decimal_numbers_present():
-    from newsrag.assist import _support_detail, _sentences_with_offsets
+    from newsrag.assist import _sentences_with_offsets, _support_detail
     corpus = "سجل معدل التضخم السنوي لإجمالي الجمهورية (12.8%) لشهر سبتمبر 2026 مقابل (12.7%) عن شهر أغسطس 2026."
     sents = [(s, "E1", off) for s, off in _sentences_with_offsets(corpus)]
     claim = "في شهر سبتمبر 2026، سجل معدل التضخم السنوي لإجمالي الجمهورية 12.8%، مقارنة بـ 12.7% في أغسطس 2026."
-    ok, sc, sent, ref, det = _support_detail(claim, sents, 0.4)
+    ok, _sc, _sent, _ref, det = _support_detail(claim, sents, 0.4)
     assert ok, det
 
 

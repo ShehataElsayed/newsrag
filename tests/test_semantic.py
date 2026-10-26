@@ -2,7 +2,6 @@
 from newsrag.semantic import compare_facets
 
 
-
 class TestComparatorRegressions:
     """Regression tests for the 2026-10-26 comparator fixes (year-aware period,
     attribution checked before direction, monthly indicator tag)."""

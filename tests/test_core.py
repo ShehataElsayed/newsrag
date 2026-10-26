@@ -1,4 +1,3 @@
-# ruff: noqa: DTZ001
 import unittest
 from datetime import datetime, timezone
 

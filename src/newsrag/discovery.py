@@ -10,10 +10,11 @@ product/privacy decision. Rate limits (HTTP 429) are surfaced, never hidden.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Callable
 import json
 import urllib.parse
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 from .core import ValidationError
 from .web import _get  # pinned-HTTPS GET with public-address resolution

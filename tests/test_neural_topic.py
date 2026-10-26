@@ -1,5 +1,6 @@
 import pytest
-from newsrag.neural import TopicNet, TOPIC_LAYER_COUNT, tfidf_centroid_baseline
+
+from newsrag.neural import TOPIC_LAYER_COUNT, TopicNet, tfidf_centroid_baseline
 
 TRAIN = (["الصحة واللقاح الجديد فعال", "لقاح كورونا والصحة العامة", "الصحة ودواء جديد للقلب",
           "السياسة والانتخابات البرلمانية", "انتخابات الرئاسة والسياسة اليوم", "الحكومة والسياسة الخارجية"],

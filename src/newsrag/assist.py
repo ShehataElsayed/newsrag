@@ -16,14 +16,15 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import Any
 
 from .arabic import ArabicLightTokenizer
 from .core import Evidence, NewsroomRAG, ValidationError, _terms
 
 try:
-    _TOKENIZER = ArabicLightTokenizer()
+    _TOKENIZER: ArabicLightTokenizer | None = ArabicLightTokenizer()
 except ImportError:  # optional snowball extra absent: surface tokens only
     _TOKENIZER = None
 _NEG = ("لم", "لن", "لا", "ليس", "ليست", "دون", "بلا", "غير", "not", "no", "never", "without")
@@ -147,7 +148,7 @@ def _sentences_with_offsets(text: str) -> list[tuple[str, int]]:
 
 def _clean(text: Any, limit: int) -> str:
     t = re.sub(r"\s+", " ", str(text if text is not None else "")).strip()[:limit]
-    return "" if re.search(r"https?://|www\.", t, re.I) else t
+    return "" if re.search(r"https?://|www\.", t, re.IGNORECASE) else t
 
 
 @dataclass(frozen=True)
@@ -229,9 +230,9 @@ class AssistResult:
                 extra.append(f"claim={d['claim']!r}")
             if "similarity" in d:
                 extra.append(f"similarity={d['similarity']} (threshold {d.get('threshold')})")
-            if "numbers_missing" in d and d["numbers_missing"]:
+            if d.get("numbers_missing"):
                 extra.append(f"numbers in claim absent from support: {d['numbers_missing']}")
-            if "evidence_ref" in d and d["evidence_ref"]:
+            if d.get("evidence_ref"):
                 extra.append(f"evidence={d['evidence_ref']}" + (f"@{d['offset']}" if "offset" in d else ""))
             if "note" in d:
                 extra.append(str(d["note"]))
@@ -260,7 +261,7 @@ def _support_detail(claim: str, sents: Sequence[tuple[str, str, int]], threshold
         claim_nums = _numbers(claim)
         support_nums = set(_numbers(sent))
         missing = [n for n in claim_nums if n not in support_nums]
-        det = {
+        det: dict[str, Any] = {
             "claim": claim, "similarity": round(sc, 3), "threshold": threshold,
             "negation_parity": {"claim": _neg_parity(claim), "support": _neg_parity(sent)},
             "numbers_in_claim": claim_nums, "numbers_missing": missing,
@@ -313,7 +314,7 @@ def _extract_json(text: str) -> dict[str, Any] | None:
         return None
 
 
-_FIELD_RE = {k: re.compile(r'"%s"\s*:\s*"((?:[^"\\]|\\.)*)' % k) for k in ("answer",)}
+_FIELD_RE = {k: re.compile(rf'"{k}"\s*:\s*"((?:[^"\\]|\\.)*)') for k in ("answer",)}
 _CLAIMS_RE = re.compile(r'"claims"\s*:\s*\[((?:[^\[\]"\\]|\\.|"(?:[^"\\]|\\.)*")*)')
 _CLOSED_STR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 _SENT_END = (".", "!", "\u061f", "?", "\n")
@@ -334,8 +335,7 @@ def _salvage_json(text: str) -> dict[str, Any] | None:
     if m:
         terminated = src[m.end():m.end() + 1] == '"'
         body = m.group(1)
-        if body.endswith("\\"):
-            body = body[:-1]  # dangling escape from a mid-escape truncation
+        body = body.removesuffix("\\")  # dangling escape from a mid-escape truncation
         try:
             body = json.loads('"' + body.replace('"', '\\"') + '"') if terminated else body
         except (json.JSONDecodeError, TypeError):
@@ -404,7 +404,7 @@ def assist(rag: NewsroomRAG, question: str, *, top_k: int = 5, max_claims: int =
         trace.append(TraceStep("decision", "info", "processing failure -> withhold output",
                                kind="processing", detail={"decision": "insufficient", "reason": "draft_unusable"}))
         return AssistResult("insufficient", "", (), (), 0, evidence,
-                            ("Model draft unusable; nothing shown. This is a generation failure, "
+                            ("Model draft unusable; nothing shown. This is a generation failure, "  # noqa: ISC004
                              "not evidence about the question.",), True,
                             trace=tuple(trace), insufficient_reason="draft_unusable")
     trace.append(TraceStep("draft_generation", "pass",
@@ -412,15 +412,16 @@ def assist(rag: NewsroomRAG, question: str, *, top_k: int = 5, max_claims: int =
                            kind="processing",
                            detail={"partial": draft_partial, "claims_extracted": None}))
     answer = _clean(draft["answer"], 8000)
-    claims = []
+    claims: list[str] = []
     seen_claims: set[str] = set()
-    for raw in (draft.get("claims") if isinstance(draft.get("claims"), list) else []):
+    draft_claims = draft.get("claims")
+    for raw in (draft_claims if isinstance(draft_claims, list) else []):
         c = str(raw if raw is not None else "")
         c = re.sub(r"\s+", " ", c).strip()
         # model-written citation/footnote markers (incl. Arabic-Indic digits)
         # are stripped before checking: they are never evidence
         c = re.sub(r"\s+", " ", _CITE.sub("", c)).strip()
-        if not c or re.search(r"https?://|www\.", c, re.I):
+        if not c or re.search(r"https?://|www\.", c, re.IGNORECASE):
             continue
         if len(c) > 220 or len(claims) >= max_claims:
             # overlong claims are dropped whole, never truncated mid-word:
@@ -478,7 +479,8 @@ def assist(rag: NewsroomRAG, question: str, *, top_k: int = 5, max_claims: int =
                          'explicitly say something is unverified. Return JSON only: {"claims":["..."]}\n'
                          f"TEXT: {cand[:2000]}")
             rc = _extract_json(str(rag.generate(rc_prompt)))
-            new_claims = [c for c in (_clean(c, 220) for c in ((rc or {}).get("claims") if isinstance(rc, dict) else [])[:5]) if c]
+            rc_claims = (rc or {}).get("claims") if isinstance(rc, dict) else None
+            new_claims = [c for c in (_clean(c, 220) for c in (rc_claims if isinstance(rc_claims, list) else [])[:5]) if c]
             framing = ("لم نعثر", "غير موثق", "لا سند", "بلا سند", "unverified", "not verified")
             injected = [c for c in new_claims if not any(f in c for f in framing) and not _support(c, sents, threshold)[0]]
             if injected:

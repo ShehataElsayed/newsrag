@@ -9,10 +9,9 @@ in the text itself. This is a sourced technical draft, not finished journalism
 - that classification is stated in the header.
 """
 from __future__ import annotations
+
 import re
-
 from typing import Any
-
 
 _SCALE_AR = {"million": "مليون", "billion": "مليار"}
 _MONTH_EN_AR = {"january": "يناير", "february": "فبراير", "march": "مارس",
@@ -131,7 +130,7 @@ def _render_answer(f: dict[str, Any]) -> str:
         pop_tok = set(re.findall(r"[A-Za-z؀-ۿ]+", str(pop)))
         prep = "في" if pop_tok & set(_PLACES) else "لدى"  # المصريون are people, not a place
         where = f" {prep} {pop}" if pop else ""
-        tp = _period_ar(ctx.get("time_period")) if ctx.get("time_period") else ""
+        tp = _period_ar(str(ctx.get("time_period"))) if ctx.get("time_period") else ""
         if tp and not any('\u0600' <= ch <= '\u06FF' for ch in tp):
             yr = re.findall(r"20\d\d", tp)
             tp = yr[0] if yr else ""  # untranslatable latin period -> year only

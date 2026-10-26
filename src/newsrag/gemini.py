@@ -43,7 +43,7 @@ class GeminiProvider:
         self._transport = transport or self._post
 
     def _post(self, req: request.Request) -> Any:
-        with request.urlopen(req, timeout=self.timeout) as resp:  # noqa: S310 - fixed https base
+        with request.urlopen(req, timeout=self.timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def _call(self, model: str, action: str, payload: dict[str, Any]) -> Any:

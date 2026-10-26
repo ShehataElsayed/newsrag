@@ -19,8 +19,9 @@ import json
 import re
 import time
 import urllib.request
-from dataclasses import dataclass, field, asdict
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from typing import Any
 
 DENYLIST = ("wikipedia.org", "wikiwand.com")
 _UA = {
@@ -75,7 +76,7 @@ def fetch_url(url: str, *, timeout: float = 30.0, opener: Callable | None = None
         # context= changes the TLS ClientHello and trips WAF fingerprinting
         # (UNESCO 403 with context, 200 without). Verification on.
         os.environ["SSL_CERT_FILE"] = extra
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - declared URLs only
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
 
 
@@ -175,7 +176,7 @@ def collect(question: str, registry: list[SourceSpec], *,
                 continue
             try:
                 raw = fetch_url(url, opener=opener)
-            except Exception as exc:  # failure is evidence too: record it
+            except Exception as exc:  # noqa: BLE001 - failure is evidence too: record it
                 rec.status, rec.detail = "failed", f"{type(exc).__name__}: {exc}"[:300]
                 provenance.append(rec)
                 continue
@@ -189,7 +190,9 @@ def collect(question: str, registry: list[SourceSpec], *,
                 # declared statistical publications arrive as PDFs; decode
                 # them locally (pypdf), never as garbage "text"
                 try:
-                    import io, pypdf
+                    import io
+
+                    import pypdf
                     reader = pypdf.PdfReader(io.BytesIO(raw))
                     text = "\n".join((pg.extract_text() or "") for pg in reader.pages)
                     # pypdf soft-wraps lines mid-sentence; an orphan fragment
@@ -207,7 +210,7 @@ def collect(question: str, registry: list[SourceSpec], *,
                         re.sub(r"(?<![.!\u061f?:;»])[ \t]*\n[ \t]*", " ", pg)
                         for pg in _paras)
                     rec.detail += f"; pdf {len(reader.pages)} pages"
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - extract failure recorded as evidence
                     rec.status, rec.detail = "failed", f"pdf extract: {type(exc).__name__}: {exc}"[:200]
                     provenance.append(rec)
                     continue
@@ -224,8 +227,8 @@ def collect(question: str, registry: list[SourceSpec], *,
                 continue
             provenance.append(rec)
             gathered.append({"source": spec.name, "url": url, "text": text,
-                       "reference_period": spec.reference_period,
-                       "topics": spec.topics})
+                       "reference_period": spec.reference_period or "",
+                       "topics": spec.topics or ""})
     return {"question": question,
             "gathered": gathered,
             "provenance": [asdict(p) for p in provenance]}

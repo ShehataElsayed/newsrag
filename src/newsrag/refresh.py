@@ -16,10 +16,10 @@ refreshes are auditable rather than silent.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
 
 from .core import Source, ValidationError
 from .sqlite import SQLiteSourceStore
@@ -94,7 +94,7 @@ class RefreshableStore:
     def close(self) -> None:
         self._store.close()
 
-    def __enter__(self) -> "RefreshableStore":
+    def __enter__(self) -> RefreshableStore:  # noqa: PYI034 - returns self at runtime
         return self
 
     def __exit__(self, *exc) -> None:

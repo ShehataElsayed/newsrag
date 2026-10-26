@@ -9,10 +9,11 @@ investigation STRUCTURE; long-form prose drafting is a separate stage.
 from __future__ import annotations
 
 import re
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-from .collector import collect, SourceSpec
-from .semantic import extract_facets, compare_facets
+from .collector import SourceSpec, collect
+from .semantic import compare_facets, extract_facets
 
 _FIGURE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:%|٪|مليون|مليار|ألف|آلاف|ملايين|حساب|حسابات|منشور|منشورات|تغريدة|تغريدات|دولار|جنيه|ريال|views?|impressions?|accounts?|posts?|percent)"
                      r"|\d{1,3}(?:,\d{3})+|\d{4,}")
@@ -22,19 +23,19 @@ _FIGURE = re.compile(r"\d+(?:[.,]\d+)?\s*(?:%|٪|مليون|مليار|ألف|آ
 _QUALITATIVE = re.compile(
     r"منسق|تنسيق|حملة|حسابات (?:وهمية|مزيفة)|وهمية|مزيفة|نفى|نفت|أنكر|أنكرت|"
     r"بحسب|وفقا|وفقاً|طبقا|طبقاً|منهجية|عينة|مصادر البيانات|أداة|"
-    r"coordinat|inauthentic|campaign|methodolog|according to|denied|disclos", re.I)
+    r"coordinat|inauthentic|campaign|methodolog|according to|denied|disclos", re.IGNORECASE)
 
 # Metric scope words: what KIND of quantity a figure is. Reach/impressions are
 # NOT unique people; views are NOT accounts; ad spend is NOT an operation budget.
 _METRIC_KIND = [
-    ("campaign_spend", re.compile(r"دولار|جنيه|ريال|درهم|spend|spent|advertis|\$", re.I)),
-    ("campaign_accounts", re.compile(r"حساب|حسابات|accounts?", re.I)),
-    ("campaign_volume", re.compile(r"منشور|منشورات|تغريدة|تغريدات|posts?|tweets?", re.I)),
-    ("campaign_reach", re.compile(r"مشاهدة|مشاهدات|وصول|انطباع|انطباعات|reach|views?|impressions?", re.I)),
+    ("campaign_spend", re.compile(r"دولار|جنيه|ريال|درهم|spend|spent|advertis|\$", re.IGNORECASE)),
+    ("campaign_accounts", re.compile(r"حساب|حسابات|accounts?", re.IGNORECASE)),
+    ("campaign_volume", re.compile(r"منشور|منشورات|تغريدة|تغريدات|posts?|tweets?", re.IGNORECASE)),
+    ("campaign_reach", re.compile(r"مشاهدة|مشاهدات|وصول|انطباع|انطباعات|reach|views?|impressions?", re.IGNORECASE)),
 ]
 
 
-_CAMP_CONTEXT = re.compile(r"حملة|حملات|حساب|منشور|تغريد|campaign|account|post|tweet|advertis", re.I)
+_CAMP_CONTEXT = re.compile(r"حملة|حملات|حساب|منشور|تغريد|campaign|account|post|tweet|advertis", re.IGNORECASE)
 
 
 def metric_kind(sent: str) -> str | None:
@@ -102,7 +103,13 @@ def decompose_question(question: str, generate_json: Callable[..., str] | None) 
     an explicit gap instead of checking a malformed pseudo-claim."""
     if generate_json is None:
         return []
-    from .semantic import _extract_json, _excache_get, _excache_put, _decomp_cache_key, _DECOMP_STATS
+    from .semantic import (
+        _DECOMP_STATS,
+        _decomp_cache_key,
+        _excache_get,
+        _excache_put,
+        _extract_json,
+    )
     # decomposition at temperature 0 is deterministic and expensive (~78s on
     # small hardware): cached, keyed on model + prompt + grammar + question +
     # decomposition version - a change to any of them invalidates old entries
@@ -115,7 +122,7 @@ def decompose_question(question: str, generate_json: Callable[..., str] | None) 
     _DECOMP_STATS["fresh"] += 1
     try:
         obj = _extract_json(str(generate_json(_DECOMPOSE_PROMPT.format(question=question.strip()[:600]))))
-    except Exception:
+    except Exception:  # noqa: BLE001 - decomposition failure degrades to no claims
         return []
     claims = obj.get("claims") if isinstance(obj, dict) else None
     if not isinstance(claims, list):
@@ -148,7 +155,7 @@ def decompose_question(question: str, generate_json: Callable[..., str] | None) 
     return _dedup_paraphrase_claims(clean[:4])
 
 
-_COMPARISON_SPLIT = re.compile(r"مقابل|مقارنة|versus|vs\.?|compared (?:to|with)", re.I)
+_COMPARISON_SPLIT = re.compile(r"مقابل|مقارنة|versus|vs\.?|compared (?:to|with)", re.IGNORECASE)
 
 
 _DATE_FRAG = re.compile(r"(?:^|[\s,(]){n}\s*,?\s*(?:19|20)\d\d|"
@@ -265,7 +272,6 @@ def _drop_subset_figures(sentence: str, figures: list[str], claim_facets: dict) 
     scope = _tokens(str(claim_facets.get("population") or "") + " "
                     + str(claim_facets.get("entity") or "") + " "
                     + str(claim_facets.get("_sentence") or ""))
-    from .semantic import _numbers
     wanted = {str(f).rstrip(".") for f in figures}
     keep_norm: set[str] = set()
     for m in _RAW_NUM.finditer(sentence):
@@ -363,7 +369,6 @@ def _year_local(sentence: str, figures: list[str], claim_facets: dict) -> list[s
     nine figures bound to one claim). Locality is measured on the figure's
     SURFACE form in the sentence (normalized values like 32200000 never
     appear literally where the source wrote 32.2 مليون)."""
-    from .semantic import _numbers
     years = set(re.findall(r"(?:19|20)\d\d", str(claim_facets.get("time_period") or "")))
     sent_years = set(re.findall(r"(?:19|20)\d\d", sentence))
     if not years or not (sent_years - years):
@@ -507,14 +512,14 @@ def dedup_paraphrase_claims(claims: list[str]) -> list[str]:
 
 
 
-_COORD_CLAIM = re.compile(r"منسّ?ق|coordinat|orchestrat", re.I)
+_COORD_CLAIM = re.compile(r"منسّ?ق|coordinat|orchestrat", re.IGNORECASE)
 _COORD_ANALYSIS = re.compile(
     r"منسّ?ق[^.]{0,40}(حملة|شبكة|سلوك|تنسيق)|(حملة|شبكة|سلوك)[^ ]{0,3}[^.]{0,20}منسّ?ق|تنسيق مركزي|سلوك غير أصيل|حسابات وهمية|"
     r"centralized coordination|well[- ]coordinated|coordinated (campaign|network|behavior|behaviour|inauthentic|posts?|accounts?)|"
     r"inauthentic behavior|orchestrated (campaign|network)|coordination (network|patterns?|model)|signs of coordination",
-    re.I)
+    re.IGNORECASE)
 _CAPTION_CUE = re.compile(r"^\s*صورة|by reviewing the (image|photo)|photo (circulating|shared)|image circulating|"
-                          r"^\d{2}, \d{4}\b", re.I)
+                          r"^\d{2}, \d{4}\b", re.IGNORECASE)
 
 
 def _coordination_required(claim_text: str) -> bool:
@@ -552,9 +557,7 @@ def _coordination_grade(sent: str) -> bool:
     # of a Coordinated Campaign Using Meltwater, the data collection..."),
     # the sentence reports process, not a coordination finding (review).
     first = re.split(r"[,،—]", sent or "", maxsplit=1)[0]
-    if _COORD_WORD.search(first) and not _HEADING_VERB.search(first):
-        return False
-    return True
+    return not (_COORD_WORD.search(first) and not _HEADING_VERB.search(first))
 
 def run_investigation(question: str, registry: list[SourceSpec], generate: Callable[..., str],
                       *, decompose_generate: Callable[..., str] | None = None,
@@ -579,8 +582,8 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
         rec(f"collect {pr['status']}: {pr['source']} ({pr['detail'][:80]})")
     claims = dedup_paraphrase_claims(decompose_question(question, decompose_generate))
     question_frame = False
-    for cl in claims:
-        rec(f"claim: {cl[:100]}")
+    for claim_line in claims:
+        rec(f"claim: {claim_line[:100]}")
     if not claims:
         # fallback for a single-fact question: the information need itself, used
         # as a scope template (never as a truth claim). It has no figures or
@@ -590,7 +593,7 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
         question_frame = True
     findings: list[dict[str, Any]] = []
     gaps: list[dict[str, str]] = []
-    claim_facets = []
+    claim_facets: list[dict[str, Any]] = []
     for c in claims:
         cf = extract_facets(c, generate)
         if cf is not None:
@@ -650,8 +653,8 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
             from .discover import _tokens
             picked: list[dict[str, str]] = []
             seen: set[int] = set()
-            for c in claim_facets:
-                ctok = _tokens(c["claim"])
+            for cl in claim_facets:
+                ctok = _tokens(cl["claim"])
                 # qualitative question: the source's DECLARED subject keywords
                 # are legitimate extra ranking signal for qualitative-kind
                 # candidates - analytic sentences ("9,000 posts on April 5",
@@ -660,7 +663,7 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                 # per-claim budget below headline/lead lines (observed failure:
                 # 10 of 11 coordination-indicator candidates ranked 18-69).
                 ttok = (_tokens(str(item.get("topics") or ""))
-                        if c.get("question_frame") else set())
+                        if cl.get("question_frame") else set())
                 ranked = sorted(
                     cands,
                     key=lambda c0: -(len(_tokens(c0["text"]) & ctok)
@@ -680,14 +683,14 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
             # a hard per-source cap. Numeric pages (qualitative share low)
             # keep the strict token-ranked budget. Every widened candidate
             # still passes the same facet comparison and abstention guards.
-            if (any(c.get("question_frame") for c in claim_facets)
+            if (any(cl.get("question_frame") for cl in claim_facets)
                     and cands
                     and sum(1 for c0 in cands if c0["kind"] in ("qualitative", "both"))
                     >= 0.35 * len(cands)):
                 ttok_s = _tokens(str(item.get("topics") or ""))
                 qtok_s: set = set()
-                for c in claim_facets:
-                    qtok_s |= _tokens(c["claim"])
+                for cl in claim_facets:
+                    qtok_s |= _tokens(cl["claim"])
                 cap = min(len(cands), max(48, 4 * max_evidence_per_source))
                 qual_rest = [c0 for c0 in cands
                              if id(c0) not in seen and c0["kind"] == "qualitative"]
@@ -758,13 +761,13 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                 continue
             best = None
             best_c = None
-            for c in claim_facets:
-                if c["facets"] is None:
+            for cl in claim_facets:
+                if cl["facets"] is None:
                     continue
-                v = compare_facets(c["facets"], ef)
+                v = compare_facets(cl["facets"], ef)
                 from .semantic import _SCOPE_PATH
                 v["scope_path"] = _SCOPE_PATH[0]
-                if (c.get("question_frame") and v.get("reason_code") == "figures_missing"
+                if (cl.get("question_frame") and v.get("reason_code") == "figures_missing"
                         and (_nums(ef.get("numbers")) or cand["kind"] in ("qualitative", "both"))):
                     # question-frame matched scope/period; evidence supplies the figure.
                     # But an evidence sentence may carry SEVERAL figures for SEVERAL
@@ -785,12 +788,12 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                         # unit glyph, entity wording) do not apply to fields.
                         bound = sorted(_nums(ef.get("numbers"))) or None
                     else:
-                        bound = _bind_answer(c["facets"], sent, ef)
+                        bound = _bind_answer(cl["facets"], sent, ef)
                         if bound is not None:
-                            bound = _answer_unit_filter(c["facets"], sent, bound) or None
-                        if bound is not None and not _entity_present(c["facets"], sent):
+                            bound = _answer_unit_filter(cl["facets"], sent, bound) or None
+                        if bound is not None and not _entity_present(cl["facets"], sent):
                             bound = None
-                    if bound is None and cand["kind"] in ("qualitative", "both") and _coordination_required(c["claim"]) and not _coordination_grade(sent):
+                    if bound is None and cand["kind"] in ("qualitative", "both") and _coordination_required(cl["claim"]) and not _coordination_grade(sent):
                         # coordination claim, caption/inference-level evidence:
                         # mention recorded, NOT an answer (review)
                         v = {"relation": "insufficient", "dimension": None, "reason_code": "coordination_bar",
@@ -801,7 +804,7 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                              "answer": None,
                              "reason": ("qualitative evidence matches the question's scope/period"
                                         + ("; figures present but not bindable to the asked period" if _nums(ef.get("numbers")) else "")
-                                        + ("; coordination-grade analysis" if _coordination_required(c["claim"]) else ""))}
+                                        + ("; coordination-grade analysis" if _coordination_required(cl["claim"]) else ""))}
                     elif bound is None and _THRESHOLD.search(sent) and _nums(ef.get("numbers")):
                         v = {"relation": "answers", "dimension": None, "reason_code": "answers_qualitative",
                              "answer": None,
@@ -809,7 +812,7 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                     elif bound is None and _nums(ef.get("numbers")):
                         v = {"relation": "insufficient", "dimension": None, "reason_code": "answer_unbound",
                              "reason": "evidence figures could not be bound to the asked period; abstaining"}
-                    elif bound is None and _coordination_required(c["claim"]) and not _coordination_grade(sent):
+                    elif bound is None and _coordination_required(cl["claim"]) and not _coordination_grade(sent):
                         v = {"relation": "insufficient", "dimension": None, "reason_code": "coordination_bar",
                              "answer": None,
                              "reason": "coordination claim requires analysis-level coordination evidence; caption/heading/inference-level mention recorded, not counted"}
@@ -817,7 +820,7 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                         v = {"relation": "answers", "dimension": None, "reason_code": "answers_qualitative",
                              "answer": None,
                              "reason": ("qualitative evidence matches the question's scope/period (no figure to bind)"
-                                        + ("; coordination-grade analysis" if _coordination_required(c["claim"]) else ""))}
+                                        + ("; coordination-grade analysis" if _coordination_required(cl["claim"]) else ""))}
                     else:
                         lex = _SCOPE_PATH[0] != "indicator"
                         v = {"relation": "answers", "dimension": None, "reason_code": "answers",
@@ -826,8 +829,8 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                                         "(provisional, scope not verified) and supplies the figure" if lex
                                         else "evidence matches the question's verified scope/period and supplies the figure")}
                 if best is None or _RANK[v["relation"]] > _RANK[best["relation"]]:
-                    best = {"claim": c["claim"], **v}
-                    best_c = c
+                    best = {"claim": cl["claim"], **v}
+                    best_c = cl
             if best is None:
                 continue
             if best["relation"] in ("supports", "contradicts", "answers", "different_scope"):

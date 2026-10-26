@@ -2,8 +2,9 @@ import json
 import unittest
 
 import pytest
-from newsrag.discovery import search_duckduckgo, search_gdelt, DiscoveryResult
+
 from newsrag.core import ValidationError
+from newsrag.discovery import DiscoveryResult, search_duckduckgo, search_gdelt
 
 
 def fake_transport(articles, status="200"):

@@ -126,7 +126,8 @@ def main():
         flag = "OK " if r["match"] else "MISMATCH"
         lim = " [KNOWN LIMITATION]" if r.get("known_limitation") else ""
         print(f'{flag} {r["id"]}: expected={r["expected"]} actual={r["actual"]} reason={r["reason"]}{lim}')
-    json.dump(results, open('/tmp/newsrag-data/arabic_cases_dev.json', 'w'), ensure_ascii=False, indent=2)
+    with open('arabic_cases_dev.json', 'w') as fh:
+        json.dump(results, fh, ensure_ascii=False, indent=2)
     n_ok = sum(1 for r in results if r["match"])
     print(f'{n_ok}/{len(results)} cases behave as documented')
 

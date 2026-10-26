@@ -3,19 +3,22 @@ from model extraction; end-to-end scored last. Raw artifacts always saved.
 Usage: python3 run_eval.py [--model PATH --binary PATH --grammar PATH]
 Without --model only the comparator-from-gold layer runs (no model needed).
 """
-import json, sys, os, time
+import json
+import os
+import sys
+import time
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 from newsrag import semantic as sm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CASES = json.load(open(os.path.join(HERE, "semantic_adversarial.json"), encoding="utf-8"))
+with open(os.path.join(HERE, "semantic_adversarial.json"), encoding="utf-8") as fh:
+    CASES = json.load(fh)
 
 def verdict_ok(case, rel, dim):
-    if rel not in case.get("acceptable", [case["expected"]]):
-        return False
-    if rel == case["expected"] and case.get("expected_dimension") and dim != case["expected_dimension"]:
-        return False
-    return True
+    return rel in case.get("acceptable", [case["expected"]]) and not (
+        rel == case["expected"] and case.get("expected_dimension")
+        and dim != case["expected_dimension"])
 
 def run_comparator_from_gold():
     rows = []
@@ -46,7 +49,10 @@ def run_with_model(model, binary, grammar, only=None):
     gen = llamacpp_generate(model, binary=binary, n_ctx=2048, n_predict=220,
                             threads=2, temperature=0.0, grammar_file=grammar,
                             extra_flags=["--single-turn"])
-    cache = json.load(open(CACHE, encoding="utf-8")) if os.path.exists(CACHE) else {}
+    cache = {}
+    if os.path.exists(CACHE):
+        with open(CACHE, encoding="utf-8") as fh:
+            cache = json.load(fh)
     for c in CASES["cases"]:
         if only and c["id"] not in only:
             continue
@@ -55,7 +61,8 @@ def run_with_model(model, binary, grammar, only=None):
         sf = sm.extract_facets(c["evidence"], gen)
         cache[c["id"]] = {"claim_facets": cf, "evidence_facets": sf,
                           "seconds": round(time.time() - t0, 1)}
-        json.dump(cache, open(CACHE, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        with open(CACHE, "w", encoding="utf-8") as fh:
+            json.dump(cache, fh, ensure_ascii=False, indent=2)
         print(f"cached {c['id']} ({cache[c['id']]['seconds']}s)", flush=True)
     extraction_rows, e2e_rows = [], []
     for c in CASES["cases"]:
@@ -105,7 +112,8 @@ def main():
         for r in e2e:
             print(f"  {r['id']}: {r['relation']}/{r.get('dimension')} ok={r['ok']}")
     dest = os.path.join(HERE, "adversarial_results.json")
-    json.dump(out, open(dest, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    with open(dest, "w", encoding="utf-8") as fh:
+        json.dump(out, fh, ensure_ascii=False, indent=2)
     print("raw artifacts ->", dest)
 
 if __name__ == "__main__":

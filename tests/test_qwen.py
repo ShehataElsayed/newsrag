@@ -1,10 +1,10 @@
 import json
 import unittest
+from typing import ClassVar
 from urllib import request
 
-from newsrag import NewsroomRAG
+from newsrag import NewsroomRAG, ValidationError
 from newsrag.qwen import QwenProvider
-from newsrag import ValidationError
 
 
 def fake_transport(payload):
@@ -17,7 +17,7 @@ def fake_transport(payload):
 
 
 class QwenProviderTests(unittest.TestCase):
-    OK = {"response": {"choices": [{"message": {"content": "خلاصة"}}]}, "expect_model": "qwen2.5:1.5b-instruct"}
+    OK: ClassVar = {"response": {"choices": [{"message": {"content": "خلاصة"}}]}, "expect_model": "qwen2.5:1.5b-instruct"}
 
     def test_local_default_needs_no_key_and_mock_never_counts_as_execution(self):
         p = QwenProvider(transport=fake_transport(self.OK))
