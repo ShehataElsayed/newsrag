@@ -15,6 +15,17 @@
 
 # Changelog
 
+## Unreleased
+
+- experimental/semantic-grading: new EXPERIMENTAL component (not part of any released
+  version). A model may only return structured facets with verbatim spans; this
+  package verifies each span against the source document (NFC + UTF-8 byte offsets)
+  and a versioned rule set decides bind/deny/abstain; no bind without a verified
+  claim span (v1.3). Includes a hardened probe runner, three test suites (all
+  passing), and a pinned local CPU runtime recipe with measured resource facts.
+  No qualified model engine exists for it yet; see the component README.
+
+
 ## 0.6.4 - 2026-10-26
 
 - CI: install the arabic and web extras in the verify/release jobs; three tests exercise ArabicLightTokenizer and newsrag.web and fail on ImportError when the extras are absent. No package behavior change. v0.6.3 is superseded before any PyPI publication.
