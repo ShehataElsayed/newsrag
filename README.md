@@ -2,7 +2,7 @@
 
 > **License:** All rights reserved from this version onward; no use, copying, modification, or redistribution without the owner's prior written permission. Earlier releases remain under their original license (see LICENSE).
 
-An auditable Python RAG toolkit for journalistic source research. Version 0.4.0 offers optional multilingual retrieval, Arabic light stemming, SQLite source storage, and guarded single-page URL ingestion. It does not verify generated claims or replace editorial source checks. Python 3.10+; Apache-2.0 (see LICENSE and NOTICE).
+An auditable Python RAG toolkit for journalistic source research. Version 0.4.0 offers optional multilingual retrieval, Arabic light stemming, SQLite source storage, and guarded single-page URL ingestion. It does not verify generated claims or replace editorial source checks. Python 3.10+. New versions are all rights reserved (see LICENSE and NOTICE); releases up to and including 0.6.4 remain under Apache-2.0 (see LICENSE-APACHE-2.0).
 
 ## Example
 
