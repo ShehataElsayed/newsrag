@@ -81,10 +81,11 @@ def fetch_url(url: str, *, timeout: float = 30.0, opener: Callable | None = None
 
 
 _META_RE = re.compile(
-    r'(?is)<meta[^>]+(?:name|property)=["\'](?:description|og:description|og:title)["\']'
+    r'<meta[^>]+(?:name|property)=["\'](?:description|og:description|og:title)["\']'
     r'[^>]+content=["\'](.*?)["\']'
-    r'|(?is)<meta[^>]+content=["\'](.*?)["\']'
-    r'[^>]+(?:name|property)=["\'](?:description|og:description|og:title)["\']')
+    r'|<meta[^>]+content=["\'](.*?)["\']'
+    r'[^>]+(?:name|property)=["\'](?:description|og:description|og:title)["\']',
+    re.IGNORECASE | re.DOTALL)
 
 
 def html_to_text2(raw: bytes) -> tuple[str, bool]:

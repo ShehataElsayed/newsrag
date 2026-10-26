@@ -15,6 +15,10 @@
 
 # Changelog
 
+## 0.6.3 - 2026-10-26
+
+- collector: meta-tag regex inline flags moved to compile flags; the mid-pattern inline flags are a hard re.error on Python 3.11+ at import. No behavior change. v0.6.2 is superseded before any PyPI publication.
+
 ## 0.6.2 - 2026-10-26
 
 - mypy configuration: optional integrations (Pillow, snowballstemmer, sentence-transformers) are guarded optional imports and now carry ignore-missing-imports overrides, since they are not installed in CI. No package behavior change. v0.6.1 is superseded before any PyPI publication.
