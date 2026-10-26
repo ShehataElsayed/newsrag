@@ -53,11 +53,11 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
             raise
 
 
-def _get(host: str, path: str, timeout: float) -> tuple[str, bytes]:
+def _get(host: str, path: str, timeout: float, user_agent: str | None = None) -> tuple[str, bytes]:
     address = _public_address(host)
     connection = _PinnedHTTPS(host, address, timeout)
     try:
-        connection.request("GET", path, headers={"User-Agent": _USER_AGENT,
+        connection.request("GET", path, headers={"User-Agent": user_agent or _USER_AGENT,
                                                    "Accept-Encoding": "identity",
                                                    "Host": host})
         response = connection.getresponse()
@@ -73,15 +73,20 @@ def _get(host: str, path: str, timeout: float) -> tuple[str, bytes]:
 
 
 def source_from_url(*, id: str, title: str, url: str, allowed_hosts: frozenset[str],
+                    blocked_hosts: frozenset[str] | None = None,
                     timeout: float = 10, fetch: Callable[[str, str, float], tuple[str, bytes]] = _get) -> Source:
     """Fetch a single publisher article only after a permitted robots.txt check.
 
     Restrict allowed_hosts to publishers reviewed by the application. Redirects
     and private IPs are rejected; page authorship still requires human review.
+    ``blocked_hosts`` is a workflow-level source exclusion: any host equal to
+    or under a blocked entry (suffix match) is refused even when allowlisted.
     """
     if not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or not 0 < timeout <= 30:
         raise ValidationError("Timeout must be between 0 and 30 seconds")
     host, path = _allowed_url(url, allowed_hosts)
+    if blocked_hosts and any(host == b or host.endswith("." + b) for b in blocked_hosts):
+        raise ValidationError(f"Source host is excluded by workflow policy: {host}")
     robots_type, robots_bytes = fetch(host, "/robots.txt", timeout)
     if "text/plain" not in robots_type or not robots_bytes:
         raise ValidationError("Cannot verify publisher robots.txt")

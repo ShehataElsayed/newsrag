@@ -1,0 +1,68 @@
+{
+  "config": "ArabicLightTokenizer RAG + concise prompt + strict schema + top_k=5 + temp0",
+  "decision": "answer",
+  "reason": "",
+  "text": "القاهرة هي عاصمة مصر، وهي تُعرف أيضًا باسم القاهرة المعز، مصر المحروسة، مدينة الألف مئذنة، وجوهرة الشرق [E1] وقد تطورت من مدينة أون في عهد ما قبل الأسرات إلى مدينة القاهرة الحديثة، التي تقع في قلب العاصمة المصرية وقد تولت العديد من الحضارات والدول تأسيسها، بما في ذلك الدولة العباسية والدولة الفاطمية كما أنها تُعتبر مركزًا اقتصاديًا وثقافيًا في مصر، حيث تقع فيها مقرات الشركات الكبرى، مركز التجارة العالمي، والبورصة [E5] وقد تُعرف أيضًا باسم القاهرة المعز، مصر المحروسة، مدينة الألف مئذنة، وجوهرة الشرق [E1]",
+  "trace": [
+    {
+      "name": "retrieval",
+      "outcome": "info",
+      "criterion": "top-5 corpus passages retrieved by the index; only excerpts count as support",
+      "kind": "evidence",
+      "detail": {
+        "passages": 5,
+        "refs": [
+          "E1",
+          "E2",
+          "E3",
+          "E4",
+          "E5"
+        ]
+      }
+    },
+    {
+      "name": "draft_generation",
+      "outcome": "pass",
+      "criterion": "model returned usable JSON with a non-empty answer",
+      "kind": "processing",
+      "detail": {
+        "partial": false,
+        "claims_extracted": null
+      }
+    },
+    {
+      "name": "claim_support",
+      "outcome": "pass",
+      "criterion": "similarity >= threshold AND equal negation parity AND every claim number present in support sentence (lexical, not entailment)",
+      "kind": "evidence",
+      "detail": {
+        "claim": "القاهرة هي عاصمة مصر، وهي تُعرف أيضًا باسم القاهرة المعز، مصر المحروسة، مدينة الألف مئذنة، وجوهرة الشرق. وقد تطورت من مدينة أون في عهد ما قبل الأسرات إلى مدينة القاهرة الحديثة، التي تقع في قلب العاصمة المصرية. وقد تولت ا",
+        "similarity": 0.47,
+        "threshold": 0.4,
+        "negation_parity": {
+          "claim": 0,
+          "support": 0
+        },
+        "numbers_in_claim": [],
+        "numbers_missing": [],
+        "claim_units": [],
+        "support_units": [],
+        "evidence_ref": "E1",
+        "offset": 329
+      }
+    },
+    {
+      "name": "decision",
+      "outcome": "info",
+      "criterion": "answer only when every extracted claim passed support checks (or an accepted guarded rewrite); extractive when only passage-grounded extracts survived; insufficient otherwise",
+      "kind": "evidence",
+      "detail": {
+        "decision": "answer",
+        "reason": "claims_supported",
+        "supported_claims": 1,
+        "total_claims": 1,
+        "limitation": "checks are lexical/numeric membership, not semantic entailment; absence of support in this corpus is not proof the claim is false"
+      }
+    }
+  ]
+}

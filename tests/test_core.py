@@ -166,3 +166,36 @@ class TestRemove(unittest.TestCase):
         self.assertEqual(r.search("beta")[0].source_id, "a")
         with self.assertRaises(ValidationError):
             r.remove("missing")
+
+
+class LeadBoostTests(unittest.TestCase):
+    """Inverted-pyramid prior: a deep chunk that merely repeats query terms
+    should not outrank the definitional lead (mirrors the real 2026-10-26
+    Arabic-article failure where the competitor sat ~11k chars deep)."""
+
+    LEAD = "القاهرة هي عاصمة مصر وأكبر مدنها، وفق بيان رسمي صادر اليوم عن الجهات المختصة. "
+    BODY = "وتشهد مصر فعاليات متنوعة هذا الأسبوع مع متابعة مستمرة من فرق العمل الميدانية المحلية في القطاعات. "
+    DEEP = ("ويراجع المؤرخون في مصر مفهوم العاصمة عبر العصور؛ فكل عاصمة حملت رمزية، وبقيت العاصمة "
+            "مركزًا، حتى غدت العاصمة عنوان الدولة الحديثة في أدبيات الإدارة والحكم. ")
+
+    def _rag(self, boost):
+        from newsrag import ArabicLightTokenizer
+        rag = NewsroomRAG(chunk_size=900, overlap=100, tokenize=ArabicLightTokenizer(), lead_boost=boost)
+        rag.add(Source(id="n1", title="خبر", text=self.LEAD + self.BODY * 120 + self.DEEP,
+                       url="https://news.example/1", published_at=datetime(2026, 10, 20, tzinfo=timezone.utc)))
+        return rag
+
+    def test_pathology_exists_without_boost(self):
+        ev = self._rag(0.0).search("ما عاصمة مصر؟", top_k=1)
+        self.assertNotEqual(ev[0].start, 0)
+
+    def test_boost_restores_lead(self):
+        ev = self._rag(0.5).search("ما عاصمة مصر؟", top_k=1)
+        self.assertEqual(ev[0].start, 0)
+        self.assertIn("عاصمة", ev[0].excerpt)
+
+    def test_boost_validation(self):
+        with self.assertRaises(ValidationError):
+            NewsroomRAG(lead_boost=-1)
+        with self.assertRaises(ValidationError):
+            NewsroomRAG(lead_decay_chars=0)

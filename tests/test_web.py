@@ -51,3 +51,34 @@ class TestWeb(unittest.TestCase):
         with self.assertRaises(ValidationError):
             source_from_url(id="a", title="A", url="https://example.org/story",
                             allowed_hosts=HOSTS, fetch=lambda *args: ("text/html", b""))
+
+
+class BlockedHostsTests(unittest.TestCase):
+    """Workflow-level source exclusion binds at ingestion, not only discovery."""
+
+    def _fetch_ok(self, host, path, timeout):
+        if path == "/robots.txt":
+            return "text/plain", b"User-agent: *\nAllow: /\n"
+        return "text/html", "<html><body><article>نص الخبر الكامل هنا.</article></body></html>".encode()
+
+    def test_blocked_host_refused_even_when_allowlisted(self):
+        with self.assertRaises(ValidationError):
+            source_from_url(id="w", title="W", url="https://ar.wikipedia.org/wiki/x",
+                            allowed_hosts=frozenset({"ar.wikipedia.org"}),
+                            blocked_hosts=frozenset({"wikipedia.org"}),
+                            fetch=self._fetch_ok)
+
+    def test_block_matches_parent_domain_and_subdomains(self):
+        for host in ("wikipedia.org", "en.wikipedia.org", "ar.m.wikipedia.org"):
+            with self.assertRaises(ValidationError):
+                source_from_url(id="w", title="W", url=f"https://{host}/wiki/x",
+                                allowed_hosts=frozenset({host}),
+                                blocked_hosts=frozenset({"wikipedia.org"}),
+                                fetch=self._fetch_ok)
+
+    def test_unrelated_host_unaffected(self):
+        s = source_from_url(id="a", title="A", url="https://example.org/story",
+                            allowed_hosts=frozenset({"example.org"}),
+                            blocked_hosts=frozenset({"wikipedia.org"}),
+                            fetch=self._fetch_ok)
+        self.assertEqual(s.id, "a")

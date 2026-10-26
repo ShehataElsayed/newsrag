@@ -1,0 +1,5 @@
+ws ::= [ \n\t]*
+char ::= [^"\\\x7F\x00-\x1F] | "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4})
+string ::= "\"" char* "\""
+string-array ::= "[" ws (string (ws "," ws string)*)? ws "]"
+root ::= "{" ws "\"claims\"" ws ":" ws string-array ws "}" ws

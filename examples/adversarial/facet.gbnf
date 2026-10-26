@@ -1,0 +1,9 @@
+ws ::= [ \n\t]*
+char ::= [^"\\\x7F\x00-\x1F] | "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4})
+string ::= "\"" char* "\""
+nullable-string ::= string | "null"
+polarity-val ::= "\"up\"" | "\"down\"" | "\"flat\"" | "\"none\"" | "null"
+metric-kind-val ::= "\"spend\"" | "\"accounts\"" | "\"volume\"" | "\"reach\"" | "\"other\"" | "\"none\"" | "null"
+figure-source-val ::= "\"platform_disclosure\"" | "\"researcher_estimate\"" | "\"official_statement\"" | "\"unknown\"" | "null"
+string-array ::= "[" ws (string (ws "," ws string)*)? ws "]"
+root ::= "{" ws "\"entity\"" ws ":" ws nullable-string ws "," ws "\"measure\"" ws ":" ws nullable-string ws "," ws "\"time_period\"" ws ":" ws nullable-string ws "," ws "\"population\"" ws ":" ws nullable-string ws "," ws "\"attribution\"" ws ":" ws nullable-string ws "," ws "\"polarity\"" ws ":" ws polarity-val ws "," ws "\"numbers\"" ws ":" ws string-array ws "," ws "\"metric_kind\"" ws ":" ws metric-kind-val ws "," ws "\"currency\"" ws ":" ws nullable-string ws "," ws "\"figure_source\"" ws ":" ws figure-source-val ws "}" ws

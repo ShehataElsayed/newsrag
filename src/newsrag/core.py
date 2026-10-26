@@ -136,6 +136,10 @@ class _Chunk:
     tokens: list[str] = field(default_factory=list)
 
 
+# Conservative Arabic question words; من/أي excluded (often content-bearing).
+_QUERY_STOP = frozenset({"ما", "ماذا", "هل", "متى", "أين", "كيف", "لماذا", "لما", "كم", "ايه", "إيه", "شنو", "ليش"})
+
+
 class NewsroomRAG:
     """Small local corpus; callable adapters connect any synchronous providers.
 
@@ -150,18 +154,24 @@ class NewsroomRAG:
                  lexical_weight: float = 0.2,
                  rerank: Reranker | None = None,
                  tokenize: Callable[[str], list[str]] | None = None,
-                 clock: Callable[[], datetime] | None = None):
+                 clock: Callable[[], datetime] | None = None,
+                 lead_boost: float = 0.0, lead_decay_chars: float = 1500.0):
         if chunk_size < 100 or not 0 <= overlap < chunk_size // 2:
             raise ValidationError("chunk_size >= 100 and 0 <= overlap < chunk_size/2 required")
         if recency_half_life_days is not None and (not isfinite(recency_half_life_days) or recency_half_life_days <= 0):
             raise ValidationError("recency_half_life_days must be positive")
         if not isfinite(lexical_weight) or not 0 <= lexical_weight <= 1:
             raise ValidationError("lexical_weight must be between 0 and 1")
+        if not isfinite(lead_boost) or lead_boost < 0:
+            raise ValidationError("lead_boost must be a finite number >= 0")
+        if not isfinite(lead_decay_chars) or lead_decay_chars <= 0:
+            raise ValidationError("lead_decay_chars must be positive")
         self.embed, self.generate, self.rerank = embed, generate, rerank
         self.tokenize = tokenize or _terms
         self.chunk_size, self.overlap = chunk_size, overlap
         self.recency_half_life_days = recency_half_life_days
         self.lexical_weight = lexical_weight
+        self.lead_boost, self.lead_decay_chars = lead_boost, lead_decay_chars
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self._chunks: list[_Chunk] = []
         self._sources: dict[str, Source] = {}
@@ -224,6 +234,10 @@ class NewsroomRAG:
         if not candidates:
             return ()
         terms = self.tokenize(query)
+        # Query-side stoplist: Arabic question/function words carry no topical
+        # signal but still earn IDF-weighted votes (e.g. "ما" matches mid-sentence
+        # "ما" in unrelated chunks). Applied to the query only, never to documents.
+        terms = [t for t in terms if t not in _QUERY_STOP] or terms
         avgdl = sum(len(c.tokens) for c in candidates) / len(candidates) or 1
         df = {term: sum(term in c.tokens for c in candidates) for term in set(terms)}
         qvec = None
@@ -256,6 +270,11 @@ class NewsroomRAG:
                        (1-self.lexical_weight) * normalized_semantic) if self.embed else lexical
             if blended <= 0:
                 continue
+            if self.lead_boost:
+                # Inverted-pyramid prior: news leads carry the core facts, so
+                # early chunks earn a bounded boost that decays with position.
+                # Off by default; opt-in, measured on dev fixtures.
+                blended *= 1 + self.lead_boost * exp(-c.start / self.lead_decay_chars)
             if self.recency_half_life_days and c.source.published_at:
                 age = max(0., (now - c.source.published_at).total_seconds()/86400)
                 blended *= 1 + .25 * exp(-log(2)*age/self.recency_half_life_days)

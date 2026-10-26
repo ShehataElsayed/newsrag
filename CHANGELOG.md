@@ -1,5 +1,10 @@
-## Unreleased
-
+- assist(): add the missing numeric support guard. Every number in a claim must
+  appear (after Eastern/Western Arabic digit normalization) in its supporting
+  sentence; a mismatch now fails closed toward extractive/insufficient instead
+  of showing a number-contradicting claim as supported. This corrects the
+  0.6.0 entry below, which described number guards the code did not contain.
+  4 new regression tests (false number rejected, matching number supported,
+  Eastern-Arabic digits normalized, negation parity retained); full suite 148.
 - assist(): fail-closed salvage of token-truncated model JSON. An unterminated
   answer string is cut back to the last sentence-final punctuation (a tail cut
   mid-number/mid-negation/mid-citation could otherwise verify falsely);
@@ -10,9 +15,9 @@
 
 # Changelog
 
-## 0.6.0 - 2026-10-25
+## 0.6.0 - 2026-10-26
 
-- Add `newsrag.assist`: experimental port of the question-only assistant decision ladder (draft, per-claim lexical support with number/negation-parity guards, guarded rewrite re-verified against its own extracted claims, answer/extractive/insufficient decision, criteria checklist). `validated_for_release` stays False; lexical support is an automated signal, not entailment.
+- Add `newsrag.assist`: experimental port of the question-only assistant decision ladder (draft, per-claim lexical support with negation-parity guard, guarded rewrite re-verified against its own extracted claims, answer/extractive/insufficient decision, criteria checklist). `validated_for_release` stays False; lexical support is an automated signal, not entailment.
 - 6 new tests with fake transports; full suite 138 tests.
 
 ## 0.5.0 - 2026-10-25
