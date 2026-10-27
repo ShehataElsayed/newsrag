@@ -63,9 +63,11 @@ def test_interrogative_claim_polarity_cannot_veto_answer():
             return self
         def __exit__(self, *a):
             return False
-        def read(self):
-            return f"<html><body><p>{EVID}</p></body></html>".encode()
-    opener = lambda req, **kw: _Resp()
+        def read(self, limit=-1):
+            return f"<html><body><p>{EVID}</p></body></html>".encode()[:limit]
+    class Robots(_Resp):
+        def read(self, limit=-1): return b"User-agent: *\nAllow: /\n"[:limit]
+    opener = lambda req, **kw: Robots() if req.full_url.endswith('/robots.txt') else _Resp()
     decomp = lambda q: json.dumps({"claims": [CLAIM]}, ensure_ascii=False)
     res = run_investigation(CLAIM, reg, _stub_generate, decompose_generate=decomp,
                             opener=opener)
@@ -124,8 +126,10 @@ def test_recordline_answer_binds_without_prose_guards():
     class _Resp:
         def __enter__(self): return self
         def __exit__(self, *a): return False
-        def read(self): return f"<html><body><p>{line}</p></body></html>".encode()
-    res = run_investigation(q, reg, gen, decompose_generate=None, opener=lambda req, **kw: _Resp())
+        def read(self, limit=-1): return f"<html><body><p>{line}</p></body></html>".encode()
+    class Robots(_Resp):
+        def read(self, limit=-1): return b"User-agent: *\nAllow: /\n"[:limit]
+    res = run_investigation(q, reg, gen, decompose_generate=None, opener=lambda req, **kw: Robots() if req.full_url.endswith("/robots.txt") else _Resp())
     ans = [f for f in res["findings"] if f["relation"] == "answers"]
     assert ans, res["findings"]
     assert set(ans[0]["answer"]) == {"2.64893068308965"}
