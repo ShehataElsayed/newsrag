@@ -27,5 +27,5 @@ setup(
     install_requires=[], extras_require={"neural": ["numpy>=1.24,<3"], "pdf": ["pypdf>=5,<7"],
                                       "multilingual": ["sentence-transformers>=3,<6"],
                                       "arabic": ["snowballstemmer>=2.2,<4"],
-                                      "web": ["trafilatura>=1.12,<3"]},
+                                      "web": ["trafilatura>=1.12,<3", "lxml_html_clean>=0.4,<1"]},
 )

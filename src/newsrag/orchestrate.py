@@ -564,8 +564,9 @@ def run_investigation(question: str, registry: list[SourceSpec], generate: Calla
                       opener: Callable | None = None, max_evidence_per_source: int = 8,
                       recorder: list | None = None,
                       discovery_trace: list[str] | None = None) -> dict[str, Any]:
-    """Run the pipeline. `generate` is a bound local-model generator (see
-    newsrag.qwen.llamacpp_generate); nothing leaves the machine. When
+    """Run collection and analysis. ``generate`` is caller-supplied and may be
+    local or remote; its configuration determines where analysis inputs go.
+    Collection accesses declared publisher URLs. This is not an offline promise. When
     `recorder` (a list) is passed, timestamped stage events are appended as
     {t, text} dicts - the raw cast an honest trial video is rendered from."""
     import time as _time

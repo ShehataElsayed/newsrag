@@ -7,7 +7,7 @@ declared source. Every attempt - success or failure - becomes a Provenance
 record (url, fetch time, publisher vs speaker, reference period, status), so a
 report can show exactly what was gathered, from where, and what failed.
 
-Hard rules (user-mandated):
+Workflow rules:
 - Wikipedia is denied at discovery, ingestion, and citation time.
 - Absence of evidence in a fetch is recorded, never treated as negation.
 - Collection is distinct from evidence support: fetching a page does not make
@@ -15,22 +15,23 @@ Hard rules (user-mandated):
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import re
 import time
 import urllib.request
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
+from urllib.parse import urlsplit
+from urllib.robotparser import RobotFileParser
+
+from .core import ValidationError
+from .web import _allowed_url, _get
 
 DENYLIST = ("wikipedia.org", "wikiwand.com")
-_UA = {
-    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                   "AppleWebKit/537.36 (KHTML, like Gecko) "
-                   "Chrome/126.0.0.0 Safari/537.36"),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
-}  # full browser header set: bare-UA requests are WAF-rejected (UNESCO 403)
+
 
 
 @dataclass
@@ -55,29 +56,77 @@ class Provenance:
     status: str                    # ok | failed | denied
     detail: str = ""               # error text or byte count
     speaker: str | None = None     # who the page attributes facts to, when distinct from publisher
+    raw_sha256: str | None = None
+    text_sha256: str | None = None
+    extraction: str | None = None
+    transport: str = "pinned_https"
 
 
 def _denied(url: str) -> bool:
-    return any(d in url for d in DENYLIST)
+    try:
+        host = (urlsplit(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return True
+    return any(host == d or host.endswith("." + d) for d in DENYLIST)
 
 
 def fetch_url(url: str, *, timeout: float = 30.0, opener: Callable | None = None) -> bytes:
-    """One declared URL only. Browser-like UA (plain urllib gets WAF-rejected
-    on several of the declared sources)."""
-    import os
-    req = urllib.request.Request(url, headers=_UA)
-    if opener is not None:
+    """One explicit HTTPS URL, robots permitted, public DNS, 2MB maximum.
+
+    Production uses the existing DNS-pinned transport, which rejects redirects.
+    An injected opener is a caller-controlled testing/transport seam, not proof
+    of network protections or publisher identity. It must enforce public DNS
+    and no redirects itself; it is labelled as injected in provenance.
+    """
+    if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout) or not 0 < timeout <= 30):
+        raise ValidationError("Timeout must be between 0 and 30 seconds")
+    if _denied(url):
+        raise ValidationError("Source host excluded by workflow policy")
+    try:
+        host = (urlsplit(url).hostname or "").lower().rstrip(".")
+        host, path = _allowed_url(url, frozenset({host}))
+    except ValueError as exc:
+        raise ValidationError("Invalid collector URL") from exc
+
+    def get(target: str) -> tuple[str, bytes]:
+        if opener is None:
+            return _get(host, target, timeout)
+        req = urllib.request.Request(f"https://{host}{target}", headers={
+            "User-Agent": "NewsRAG/0.3 (+https://github.com/ShehataElsayed/newsrag)"})
         with opener(req, timeout=timeout) as resp:
-            return resp.read()
-    extra = os.environ.get("NEWSRAG_EXTRA_CA")
-    if extra and os.environ.get("SSL_CERT_FILE") != extra:
-        # widen the DEFAULT trust store (certifi + fetched AIA intermediates)
-        # via SSL_CERT_FILE, keeping the stock code path: an explicit
-        # context= changes the TLS ClientHello and trips WAF fingerprinting
-        # (UNESCO 403 with context, 200 without). Verification on.
-        os.environ["SSL_CERT_FILE"] = extra
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+            # Test transports may omit headers/status, never treated as live proof.
+            status = getattr(resp, "status", 200)
+            final_url = resp.geturl() if hasattr(resp, "geturl") else req.full_url
+            if status != 200 or final_url != req.full_url:
+                raise ValidationError("Redirect or non-200 collector response rejected")
+            raw = resp.read(2_000_001)
+            if len(raw) > 2_000_000:
+                raise ValidationError("Collector response exceeds 2 MB")
+            headers = getattr(resp, "headers", {})
+            return headers.get("Content-Type", "text/plain" if target == "/robots.txt" else "text/html"), raw
+
+    try:
+        kind, robots_raw = get("/robots.txt")
+    except Exception as exc:
+        raise ValidationError(f"robots check failed: {type(exc).__name__}") from exc
+    if "text/plain" not in kind or not robots_raw:
+        raise ValidationError("Cannot verify publisher robots.txt")
+    robot = RobotFileParser()
+    robot.parse(robots_raw.decode("utf-8", errors="replace").splitlines())
+    agent = "NewsRAG/0.3 (+https://github.com/ShehataElsayed/newsrag)"
+    if not robot.can_fetch(agent, url):
+        raise ValidationError("Publisher robots.txt disallows collector URL")
+    if robot.crawl_delay(agent):
+        raise ValidationError("Publisher crawl delay requires external scheduling")
+    try:
+        kind, raw = get(path)
+    except Exception as exc:
+        raise ValidationError(f"article fetch failed: {type(exc).__name__}") from exc
+    if not any(t in kind.lower() for t in ("text/html", "application/json", "application/pdf",
+                                          "text/plain", "application/xhtml+xml")):
+        raise ValidationError("Unsupported collector content type")
+    return raw
 
 
 _META_RE = re.compile(
@@ -170,7 +219,11 @@ def collect(question: str, registry: list[SourceSpec], *,
                              fetched_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                              publisher=spec.publisher,
                              reference_period=spec.reference_period,
-                             status="ok")
+                             status="ok", transport="injected" if opener else "pinned_https")
+            if spec.kind not in ("html", "json", "pdf", "text"):
+                rec.status, rec.detail = "failed", "Unsupported declared source kind"
+                provenance.append(rec)
+                continue
             if _denied(url):
                 rec.status, rec.detail = "denied", "denylist (Wikipedia excluded at ingestion)"
                 provenance.append(rec)
@@ -181,9 +234,12 @@ def collect(question: str, registry: list[SourceSpec], *,
                 rec.status, rec.detail = "failed", f"{type(exc).__name__}: {exc}"[:300]
                 provenance.append(rec)
                 continue
+            rec.raw_sha256 = hashlib.sha256(raw).hexdigest()
+            rec.extraction = spec.kind
             if spec.kind == "html" and raw[:5] != b"%PDF-":
                 text, used_meta = html_to_text2(raw)
                 if used_meta:
+                    rec.extraction = "html_with_meta_summary"
                     rec.detail += "; meta-summary fallback (JS shell: summary, not full-page coverage)"
             elif spec.kind == "json":
                 text = json_to_text(raw)
@@ -211,6 +267,7 @@ def collect(question: str, registry: list[SourceSpec], *,
                         re.sub(r"(?<![.!\u061f?:;»])[ \t]*\n[ \t]*", " ", pg)
                         for pg in _paras)
                     rec.detail += f"; pdf {len(reader.pages)} pages"
+                    rec.extraction = "pdf_text"
                 except Exception as exc:  # noqa: BLE001 - extract failure recorded as evidence
                     rec.status, rec.detail = "failed", f"pdf extract: {type(exc).__name__}: {exc}"[:200]
                     provenance.append(rec)
@@ -226,6 +283,11 @@ def collect(question: str, registry: list[SourceSpec], *,
                 rec.status, rec.detail = "denied", f"WAF rejection stub ({len(raw)} bytes)"
                 provenance.append(rec)
                 continue
+            if not text.strip():
+                rec.status, rec.detail = "failed", "No extractable source text"
+                provenance.append(rec)
+                continue
+            rec.text_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
             provenance.append(rec)
             gathered.append({"source": spec.name, "url": url, "text": text,
                        "reference_period": spec.reference_period or "",

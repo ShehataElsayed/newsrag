@@ -149,6 +149,7 @@ class NewsroomRAG:
     """
     def __init__(self, *, embed: Embedder | None = None,
                  generate: Generator | None = None,
+                 query_embed: Embedder | None = None,
                  chunk_size: int = 900, overlap: int = 100,
                  recency_half_life_days: float | None = None,
                  lexical_weight: float = 0.2,
@@ -166,6 +167,9 @@ class NewsroomRAG:
             raise ValidationError("lead_boost must be a finite number >= 0")
         if not isfinite(lead_decay_chars) or lead_decay_chars <= 0:
             raise ValidationError("lead_decay_chars must be positive")
+        if query_embed is not None and embed is None:
+            raise ValidationError("query_embed requires a document embedder")
+        self.query_embed = query_embed
         self.embed, self.generate, self.rerank = embed, generate, rerank
         self.tokenize = tokenize or _terms
         self.chunk_size, self.overlap = chunk_size, overlap
@@ -242,7 +246,7 @@ class NewsroomRAG:
         df = {term: sum(term in c.tokens for c in candidates) for term in set(terms)}
         qvec = None
         if self.embed:
-            qvectors = self.embed([query])
+            qvectors = (self.query_embed or self.embed)([query])
             if len(qvectors) != 1 or not qvectors[0] or any(not isinstance(x, (int, float)) or not isfinite(x) for x in qvectors[0]):
                 raise ValidationError("Embedder must return one finite, non-empty query vector")
             qvec = qvectors[0]

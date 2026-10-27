@@ -25,9 +25,11 @@ endpoint is not deployment permission.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Callable
 from typing import Any
 from urllib import request
+from urllib.parse import urlsplit
 
 from .core import ValidationError
 
@@ -44,19 +46,38 @@ class QwenProvider:
     def __init__(self, *, model: str = "qwen2.5:1.5b-instruct",
                  base_url: str = "http://localhost:11434/v1",
                  api_key: str | None = None, timeout: float = 60.0,
-                 transport: Callable[[request.Request], Any] | None = None):
+                 transport: Callable[[request.Request], Any] | None = None,
+                 max_tokens: int = 512, max_prompt_chars: int = 24_000,
+                 require_stop: bool = False):
         if not isinstance(model, str) or not model.strip():
             raise ValidationError("QwenProvider needs a non-empty model name")
-        if not isinstance(base_url, str) or "://" not in base_url:
-            raise ValidationError("QwenProvider needs a base_url with a scheme")
-        scheme, host = base_url.split("://", 1)
-        host = host.split("/", 1)[0].split(":", 1)[0]
-        if scheme != "https" and host not in _LOCAL_HOSTS:
-            raise ValidationError(
-                "remote Qwen endpoints require HTTPS; plain HTTP is allowed only for localhost")
-        if host not in _LOCAL_HOSTS and not (api_key and api_key.strip()):
-            raise ValidationError(
-                "remote Qwen endpoints need an explicit API key; do not send inputs without one")
+        if not isinstance(base_url, str) or any(c.isspace() for c in base_url):
+            raise ValidationError("QwenProvider needs a valid endpoint URL")
+        try:
+            parsed = urlsplit(base_url)
+            host = parsed.hostname
+            port = parsed.port
+        except ValueError as exc:
+            raise ValidationError("QwenProvider needs a valid endpoint URL") from exc
+        if (parsed.scheme not in ("http", "https") or not host or parsed.username
+                or parsed.password or parsed.query or parsed.fragment
+                or (port is not None and not 1 <= port <= 65535)):
+            raise ValidationError("Endpoint must be HTTP(S), without credentials, query or fragment")
+        if parsed.scheme != "https" and host not in _LOCAL_HOSTS:
+            raise ValidationError("remote Qwen endpoints require HTTPS; HTTP is local only")
+        if host not in _LOCAL_HOSTS and not (isinstance(api_key, str) and api_key.strip()):
+            raise ValidationError("remote Qwen endpoints need an explicit API key")
+        if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+                or not math.isfinite(timeout) or not 0 < timeout <= 180):
+            raise ValidationError("Timeout must be between 0 and 180 seconds")
+        for name, value, upper in (("max_tokens", max_tokens, 4096),
+                                    ("max_prompt_chars", max_prompt_chars, 200_000)):
+            if type(value) is not int or not 1 <= value <= upper:
+                raise ValidationError(f"{name} must be an integer in 1..{upper}")
+        if not isinstance(require_stop, bool):
+            raise ValidationError("require_stop must be boolean")
+        self.require_stop = require_stop
+        self.max_tokens, self.max_prompt_chars = max_tokens, max_prompt_chars
         self.model = model
         self.base_url = base_url.rstrip("/")
         self._key = api_key
@@ -68,13 +89,39 @@ class QwenProvider:
         # never set these flags.
         self.response_received = False
         self.model_reported: str | None = None
+        self.finish_reason: str | None = None
+        self.usage: dict[str, int | float] = {}
+        self.last_status = "not_called"
 
     def _post(self, req: request.Request) -> Any:
-        with request.urlopen(req, timeout=self.timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        # Never forward a bearer token to a redirect destination. A failed
+        # request is surfaced once; this adapter has no retry or paid fallback.
+        class NoRedirect(request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+
+        with request.build_opener(NoRedirect()).open(req, timeout=self.timeout) as resp:
+            raw = resp.read(2_000_001)
+        if len(raw) > 2_000_000:
+            raise ValidationError("Qwen response exceeds 2 MB")
+        return json.loads(raw.decode("utf-8"))
 
     def generate(self, prompt: str) -> str:
-        """One chat-completion call. Fail-closed: malformed responses raise."""
+        """One bounded nonstreaming call, with no automatic retries.
+
+        The output cap is not an account-wide free-usage guarantee. Configure
+        the provider's hard no-charge limit before enabling a public endpoint.
+        Metadata is diagnostic only: usage and model identity are server reports,
+        never independent evidence of billing, exact execution or claim truth.
+        Prompt and completion text are not retained on this adapter.
+        """
+        self.response_received = False
+        self.model_reported = None
+        self.finish_reason = None
+        self.usage = {}
+        self.last_status = "rejected"
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > self.max_prompt_chars:
+            raise ValidationError("Prompt must be non-empty and within max_prompt_chars")
         headers = {"content-type": "application/json"}
         if self._key:
             headers["authorization"] = f"Bearer {self._key}"
@@ -84,18 +131,40 @@ class QwenProvider:
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.2,
+                "stream": False,
+                "max_tokens": self.max_tokens,
             }).encode("utf-8"),
             headers=headers, method="POST")
+        self.last_status = "failed"
         body = self._transport(req)
+        if not isinstance(body, dict) or body.get("error"):
+            raise ValidationError("Qwen endpoint returned an error or malformed response")
         try:
-            content = body["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise ValidationError(f"Qwen endpoint returned an unusable response: {exc}") from exc
+            choice = body["choices"][0]
+            message = choice["message"]
+            content = message["content"]
+            finish = choice.get("finish_reason")
+        except (KeyError, IndexError, TypeError, AttributeError) as exc:
+            raise ValidationError("Qwen endpoint returned an unusable response") from exc
+        if (self.require_stop and finish != "stop") or (finish is not None and finish != "stop"):
+            raise ValidationError("Qwen completion did not finish normally; partial/tool output rejected")
+        if message.get("refusal") or message.get("tool_calls") or message.get("function_call"):
+            raise ValidationError("Qwen endpoint returned a refusal or tool call, not an answer")
         if not isinstance(content, str) or not content.strip():
             raise ValidationError("Qwen endpoint returned an empty completion")
+        reported_usage = body.get("usage")
+        if isinstance(reported_usage, dict):
+            for field in ("prompt_tokens", "completion_tokens", "total_tokens", "neurons"):
+                value = reported_usage.get(field)
+                if (isinstance(value, (int, float)) and not isinstance(value, bool)
+                        and math.isfinite(value) and value >= 0):
+                    self.usage[field] = value
+        self.finish_reason = finish
         if not self._injected_transport:
             self.response_received = True
-            self.model_reported = body.get("model") if isinstance(body, dict) else None
+            reported_model = body.get("model")
+            self.model_reported = reported_model if isinstance(reported_model, str) else None
+        self.last_status = "ok"
         return content
 
 
@@ -195,15 +264,30 @@ def llamacpp_generate(model_path: str, *, binary: str = "llama-completion",
 def llamacpp_server_generate(*, base_url: str = "http://127.0.0.1:18099",
                              n_predict: int = 220, temperature: float = 0.0,
                              grammar_file: str | None = None,
-                             timeout: float = 120.0) -> Callable[[str], str]:
-    """Local generation against a PERSISTENT llama-server on localhost.
+                             timeout: float = 120.0,
+                             allow_remote: bool = False) -> Callable[[str], str]:
+    """Generation against a caller-operated persistent llama-server.
 
-    Same local-execution guarantee as llamacpp_generate (the server loads the
-    named GGUF on this machine; nothing leaves the process), but the model is
-    loaded once instead of per call: on small hardware the per-call reload
-    dominates (15s -> ~2s per extraction, diagnosis). Grammar is passed
-    per request, so one server serves every constrained task. The caller owns
-    the server lifecycle (start/stop around the run)."""
+    Default accepts only loopback HTTP(S) endpoints. Explicit ``allow_remote``
+    permits HTTPS remote endpoints, which send inputs off-machine and require
+    the caller's separate disclosure/permission. No key transport is provided.
+    A loopback URL is not proof which model ran, or that the process does not
+    itself proxy requests elsewhere. The caller owns server lifecycle and model
+    verification. This adapter never starts/downloads a model.
+    """
+    try:
+        endpoint = urlsplit(base_url)
+        host = endpoint.hostname
+        port = endpoint.port
+    except (ValueError, TypeError) as exc:
+        raise ValidationError("Invalid llama-server endpoint") from exc
+    if (not isinstance(base_url, str) or any(c.isspace() for c in base_url)
+            or endpoint.scheme not in ("http", "https") or not host
+            or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment
+            or (port is not None and not 1 <= port <= 65535)):
+        raise ValidationError("Invalid llama-server endpoint")
+    if host not in _LOCAL_HOSTS and not (allow_remote and endpoint.scheme == "https"):
+        raise ValidationError("Nonlocal llama-server requires explicit allow_remote and HTTPS")
     from pathlib import Path
     grammar = None
     if grammar_file is not None:
@@ -218,8 +302,17 @@ def llamacpp_server_generate(*, base_url: str = "http://127.0.0.1:18099",
             base_url.rstrip("/") + "/completion",
             data=json.dumps(body).encode("utf-8"),
             headers={"Content-Type": "application/json"}, method="POST")
-        with request.urlopen(req, timeout=timeout) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        class NoRedirect(request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+
+        with request.build_opener(NoRedirect()).open(req, timeout=timeout) as resp:
+            raw = resp.read(2_000_001)
+        if len(raw) > 2_000_000:
+            raise ValidationError("llama-server response exceeds 2 MB")
+        payload = json.loads(raw.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValidationError("llama-server returned malformed content")
         content = payload.get("content")
         if not isinstance(content, str) or not content.strip():
             raise ValidationError("llama-server returned an empty completion")
